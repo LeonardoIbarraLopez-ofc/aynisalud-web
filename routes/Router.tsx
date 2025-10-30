@@ -7,6 +7,7 @@ import AgendaPage from '../pages/AgendaPage';
 import AppLayout from '../layouts/AppLayout';
 import ConsultationPage from '../pages/ConsultationPage';
 import PatientAppointmentsPage from '../pages/PatientAppointmentsPage';
+const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'));
 
 const ProtectedRoute: React.FC = () => {
     const { isAuthenticated } = useAuth();
@@ -35,7 +36,7 @@ const AppRouter: React.FC = () => {
                     {/* Patient Portal Routes */}
                     <Route path="/mis-citas" element={<PatientAppointmentsPage />} />
                     <Route path="/facturacion" element={<div className="p-4">Página de Facturación (en construcción)</div>} />
-                    <Route path="/historial" element={<div className="p-4">Página de Historial Médico (en construcción)</div>} />
+                    <Route path="/historial" element={<React.Suspense fallback={<div className="p-4">Cargando...</div>}><PatientMedicalHistoryPage /></React.Suspense>} />
                 </Route>
                  <Route path="*" element={<Navigate to="/" />} />
             </Routes>

@@ -1,5 +1,6 @@
 import React from 'react';
 import PageHeader from '../components/common/PageHeader';
+import PatientCalendar from '../components/features/patient/PatientCalendar';
 
 const PatientAppointmentsPage: React.FC = () => {
   return (
@@ -11,9 +12,19 @@ const PatientAppointmentsPage: React.FC = () => {
             </button>
         </div>
       </PageHeader>
-      <div className="bg-white p-8 rounded-lg shadow-md text-center">
-        <h2 className="text-xl font-semibold text-gray-700">Página en Construcción</h2>
-        <p className="text-gray-500 mt-2">Aquí podrá ver el historial de sus citas pasadas y futuras.</p>
+
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* Main calendar view */}
+          <PatientCalendar />
+        </div>
+
+        <aside className="hidden lg:block">
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <h4 className="font-semibold text-gray-700">Ayuda rápida</h4>
+            <p className="text-sm text-gray-500 mt-2">Aquí verá las próximas citas, opciones para reprogramar y acceso a su historial.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -284,14 +284,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({ isOpen, onClose, on
                 <div className="flex items-center space-x-2">
                     <input type="date" id="date" value={appointmentDate} onChange={e => setAppointmentDate(e.target.value)} className="p-2 border rounded-md w-full" />
                     <input type="time" id="time" value={appointmentTime} onChange={e => setAppointmentTime(e.target.value)} className="p-2 border rounded-md w-full" />
-                    <button 
-                        type="button" 
-                        onClick={() => setAppointmentTime('15:30')}
-                        title="Encontrar Siguiente Disponible"
-                        className="p-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3l2 1" /></svg>
-                    </button>
+          <button 
+            type="button" 
+            onClick={() => setAppointmentTime('15:30')}
+            title="Encontrar Siguiente Disponible"
+            className="p-2 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-600 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3l2 1" /></svg>
+          </button>
                 </div>
             </div>
 

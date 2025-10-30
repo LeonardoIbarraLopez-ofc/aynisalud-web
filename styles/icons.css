@@ -1,0 +1,37 @@
+:root{
+  --icon-stroke-default:1.5;
+  --icon-stroke-small:1;
+}
+
+/* Apply a baseline stroke width to icons and ensure they inherit currentColor */
+svg.icon {
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke-default);
+  vector-effect: non-scaling-stroke; /* optional: keep stroke consistent when scaling - remove if you want stroke to scale */
+  display: inline-block;
+}
+
+/* Override any presentation attributes on child paths (some SVGs have strokeWidth attributes). */
+svg.icon [stroke-width] {
+  stroke-width: var(--icon-stroke-default) !important;
+}
+
+/* Thinner strokes on small screens */
+@media (max-width: 640px) {
+  svg.icon {
+    stroke-width: var(--icon-stroke-small) !important;
+  }
+  svg.icon [stroke-width] {
+    stroke-width: var(--icon-stroke-small) !important;
+  }
+}
+
+/* Slightly heavier on large displays */
+@media (min-width: 1280px) {
+  svg.icon {
+    stroke-width: calc(var(--icon-stroke-default) + 0.5);
+  }
+  svg.icon [stroke-width] {
+    stroke-width: calc(var(--icon-stroke-default) + 0.5) !important;
+  }
+}
