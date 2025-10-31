@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addEhrEvent = exports.getPatientEhr = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.addEhrEvent = exports.getPatientEhr = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const uuid_1 = require("uuid");
@@ -53,6 +53,8 @@ exports.createUserAdmin = users.createUserAdmin;
 exports.updateProfile = users.updateProfile;
 exports.linkPatient = users.linkPatient;
 exports.setCustomClaims = users.setCustomClaims;
+exports.getMyProfile = users.getMyProfile;
+exports.getMyProfileHttp = users.getMyProfileHttp;
 // Callable: getPatientEhr
 exports.getPatientEhr = functions.https.onCall(async (data, context) => {
     const { uid, token } = await (0, utils_1.requireAuth)(context, data);

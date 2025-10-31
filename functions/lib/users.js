@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listUsersByRole = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.listUsersByRole = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const utils_1 = require("./utils");
@@ -263,6 +263,56 @@ exports.getMyProfile = functions.https.onCall(async (data, context) => {
     const doc = snap.data();
     // return token claims for client-side routing decisions
     return { exists: true, profile: doc, claims: caller.token || {} };
+});
+// HTTP endpoint variant for local development that returns the same profile payload
+// and sets CORS headers so browser clients can call it directly when the callable path
+// has preflight/CORS issues in the emulator. It expects Authorization: Bearer <idToken>.
+exports.getMyProfileHttp = functions.https.onRequest(async (req, res) => {
+    // CORS preflight handling
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+    try {
+        // Allow token via Authorization header or via query param `idToken` for simple GET fallback from browser
+        const authHeader = (req.get('Authorization') || req.get('authorization') || '');
+        let idToken = null;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            idToken = authHeader.replace(/^Bearer\s+/, '');
+        }
+        else if (req.method === 'GET' && req.query && req.query.idToken) {
+            // NOTE: passing idToken in query is acceptable for local emulator development only
+            idToken = String(req.query.idToken || '');
+        }
+        if (!idToken) {
+            res.status(401).json({ error: 'Missing Authorization Bearer token or idToken query param' });
+            return;
+        }
+        // verify token via admin SDK
+        const decoded = await admin.auth().verifyIdToken(idToken).catch((e) => {
+            console.error('verifyIdToken failed', e && e.message ? e.message : e);
+            return null;
+        });
+        if (!decoded || !decoded.uid) {
+            res.status(401).json({ error: 'Invalid token' });
+            return;
+        }
+        const uid = decoded.uid;
+        const snap = await utils_1.db.doc(`users/${uid}`).get();
+        if (!snap.exists) {
+            res.json({ exists: false });
+            return;
+        }
+        const doc = snap.data();
+        res.json({ exists: true, profile: doc, claims: decoded || {} });
+    }
+    catch (err) {
+        console.error('getMyProfileHttp error', err && err.stack ? err.stack : err);
+        res.status(500).json({ error: (err && err.message) ? err.message : String(err) });
+    }
 });
 // Admin-only callable to list users by role (useful for admin UI)
 exports.listUsersByRole = functions.https.onCall(async (data, context) => {

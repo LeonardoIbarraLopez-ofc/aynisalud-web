@@ -18,6 +18,8 @@ export const createUserAdmin = users.createUserAdmin;
 export const updateProfile = users.updateProfile;
 export const linkPatient = users.linkPatient;
 export const setCustomClaims = users.setCustomClaims;
+export const getMyProfile = users.getMyProfile;
+export const getMyProfileHttp = users.getMyProfileHttp;
 
 // Callable: getPatientEhr
 export const getPatientEhr = functions.https.onCall(async (data: any, context: any) => {

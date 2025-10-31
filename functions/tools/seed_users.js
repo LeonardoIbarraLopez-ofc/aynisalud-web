@@ -8,8 +8,9 @@
  */
 
 // Ensure emulator env vars are set BEFORE initializing admin so the SDK talks to the local emulators.
-process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
-process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
+// Defaults updated to match project's firebase.json which uses alternate ports to avoid local conflicts.
+process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || 'localhost:9100';
+process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8085';
 process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'local-aynialud';
 
 const admin = require('firebase-admin');
