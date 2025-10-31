@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // For security: deny any client access directly to patient timeline documents.
+    // This forces use of Cloud Functions (API Facade) to read/write EHR.
+    match /patients/{patientId}/timeline/{eventId} {
+      allow read, write: if false;
+    }
+
+    // Allow everything else in emulator mode for now (development convenience).
+    // In production, replace with stricter rules.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

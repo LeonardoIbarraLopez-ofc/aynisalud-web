@@ -1,0 +1,26 @@
+{
+  "name": "aynialud-functions",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint . --ext .ts",
+    "prepare-env": "echo 'Run npm install to install dependencies. Configure Firebase with firebase init.'",
+    "start": "echo 'Functions environment prepared. Add your functions in src/ and run npm run start:emulator'",
+  "start:emulator": "npm run build && firebase emulators:start --only functions,firestore --project local-aynialud",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.10.1",
+    "firebase-functions": "^6.6.0",
+    "uuid": "^9.0.0"
+  },
+  "main": "lib/index.js",
+  "devDependencies": {
+    "typescript": "^5.1.6",
+    "@types/uuid": "^9.0.2"
+  }
+}
