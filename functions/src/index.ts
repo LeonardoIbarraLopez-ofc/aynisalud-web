@@ -12,6 +12,7 @@ if (!admin.apps || admin.apps.length === 0) {
 // Load side-effect modules after initialization and re-export their callables
 // so the Functions emulator detects them as top-level exports.
 const users = require('./users');
+const admin2fa = require('./admin2fa');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 export const createUserAdmin = users.createUserAdmin;
@@ -20,6 +21,10 @@ export const linkPatient = users.linkPatient;
 export const setCustomClaims = users.setCustomClaims;
 export const getMyProfile = users.getMyProfile;
 export const getMyProfileHttp = users.getMyProfileHttp;
+export const requestAdmin2FA = admin2fa.requestAdmin2FA;
+export const verifyAdmin2FA = admin2fa.verifyAdmin2FA;
+export const requestAdmin2FAHttp = admin2fa.requestAdmin2FAHttp;
+export const verifyAdmin2FAHttp = admin2fa.verifyAdmin2FAHttp;
 
 // Callable: getPatientEhr
 export const getPatientEhr = functions.https.onCall(async (data: any, context: any) => {

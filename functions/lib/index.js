@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addEhrEvent = exports.getPatientEhr = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.addEhrEvent = exports.getPatientEhr = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const uuid_1 = require("uuid");
@@ -47,6 +47,7 @@ if (!admin.apps || admin.apps.length === 0) {
 // Load side-effect modules after initialization and re-export their callables
 // so the Functions emulator detects them as top-level exports.
 const users = require('./users');
+const admin2fa = require('./admin2fa');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 exports.createUserAdmin = users.createUserAdmin;
@@ -55,6 +56,10 @@ exports.linkPatient = users.linkPatient;
 exports.setCustomClaims = users.setCustomClaims;
 exports.getMyProfile = users.getMyProfile;
 exports.getMyProfileHttp = users.getMyProfileHttp;
+exports.requestAdmin2FA = admin2fa.requestAdmin2FA;
+exports.verifyAdmin2FA = admin2fa.verifyAdmin2FA;
+exports.requestAdmin2FAHttp = admin2fa.requestAdmin2FAHttp;
+exports.verifyAdmin2FAHttp = admin2fa.verifyAdmin2FAHttp;
 // Callable: getPatientEhr
 exports.getPatientEhr = functions.https.onCall(async (data, context) => {
     const { uid, token } = await (0, utils_1.requireAuth)(context, data);

@@ -91,7 +91,7 @@ async function main() {
   await createUserIfMissing('patient@local.test', 'patient123', 'Paciente Ejemplo', 'patient', 'clinic-1');
   // add the remaining roles
   await createUserIfMissing('specialist@local.test', 'specialist123', 'Especialista Ejemplo', 'specialist', 'clinic-1');
-  await createUserIfMissing('admin@local.test', 'admin123', 'Admin Ejemplo', 'admin', null);
+  await createUserIfMissing('leo.ibarralopez@gmail.com', 'admin123', 'Admin Ejemplo', 'admin', null);
   console.log('Seeding complete');
 }
 
