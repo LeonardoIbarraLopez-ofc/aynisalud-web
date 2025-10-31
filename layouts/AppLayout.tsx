@@ -23,6 +23,10 @@ const NavLinks: React.FC<{ role: UserRole }> = ({ role }) => {
     <>
       <NavLink to="/" end className={navLinkClass}>Dashboard</NavLink>
       <NavLink to="/agenda" className={navLinkClass}>Agenda</NavLink>
+      {/* Admin-only: Usuarios management link */}
+      {role === 'admin' && (
+        <NavLink to="/admin/usuarios" className={navLinkClass}>Usuarios</NavLink>
+      )}
       {/* Add more staff links here */}
     </>
   );

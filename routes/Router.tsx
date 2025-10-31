@@ -8,6 +8,15 @@ import AppLayout from '../layouts/AppLayout';
 import ConsultationPage from '../pages/ConsultationPage';
 import PatientAppointmentsPage from '../pages/PatientAppointmentsPage';
 const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'));
+const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
+
+const AdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
+    if (!user || (user as any).role !== 'admin') {
+        return <Navigate to="/" replace />;
+    }
+    return <>{children}</>;
+};
 
 const ProtectedRoute: React.FC = () => {
     const { isAuthenticated } = useAuth();
@@ -37,6 +46,9 @@ const AppRouter: React.FC = () => {
                     <Route path="/mis-citas" element={<PatientAppointmentsPage />} />
                     <Route path="/facturacion" element={<div className="p-4">Página de Facturación (en construcción)</div>} />
                     <Route path="/historial" element={<React.Suspense fallback={<div className="p-4">Cargando...</div>}><PatientMedicalHistoryPage /></React.Suspense>} />
+
+                    {/* Admin Routes */}
+                    <Route path="/admin/usuarios" element={<AdminOnly><React.Suspense fallback={<div className="p-4">Cargando...</div>}><AdminUsersPage /></React.Suspense></AdminOnly>} />
                 </Route>
                  <Route path="*" element={<Navigate to="/" />} />
             </Routes>
