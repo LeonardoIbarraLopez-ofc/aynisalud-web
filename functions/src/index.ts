@@ -13,6 +13,9 @@ if (!admin.apps || admin.apps.length === 0) {
 // so the Functions emulator detects them as top-level exports.
 const users = require('./users');
 const admin2fa = require('./admin2fa');
+const passwordReset = require('./passwordReset');
+const agenda = require('./agenda');
+const billing = require('./billing');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 export const createUserAdmin = users.createUserAdmin;
@@ -25,6 +28,32 @@ export const requestAdmin2FA = admin2fa.requestAdmin2FA;
 export const verifyAdmin2FA = admin2fa.verifyAdmin2FA;
 export const requestAdmin2FAHttp = admin2fa.requestAdmin2FAHttp;
 export const verifyAdmin2FAHttp = admin2fa.verifyAdmin2FAHttp;
+export const requestPasswordResetHttp = passwordReset.requestPasswordResetHttp;
+export const verifyPasswordResetHttp = passwordReset.verifyPasswordResetHttp;
+export const listAgendaAppointments = agenda.listAgendaAppointments;
+export const getAppointmentsForPatient = agenda.getAppointmentsForPatient;
+export const getAppointmentById = agenda.getAppointmentById;
+export const createAppointment = agenda.createAppointment;
+export const updateAppointmentStatus = agenda.updateAppointmentStatus;
+export const searchPatients = agenda.searchPatients;
+export const createQuickPatient = agenda.createQuickPatient;
+export const listDoctors = agenda.listDoctors;
+export const listAppointmentTypes = agenda.listAppointmentTypes;
+export const listAgendaAppointmentsHttp = agenda.listAgendaAppointmentsHttp;
+export const getAppointmentsForPatientHttp = agenda.getAppointmentsForPatientHttp;
+export const getAppointmentByIdHttp = agenda.getAppointmentByIdHttp;
+export const createAppointmentHttp = agenda.createAppointmentHttp;
+export const updateAppointmentStatusHttp = agenda.updateAppointmentStatusHttp;
+export const searchPatientsHttp = agenda.searchPatientsHttp;
+export const createQuickPatientHttp = agenda.createQuickPatientHttp;
+export const listDoctorsHttp = agenda.listDoctorsHttp;
+export const listAppointmentTypesHttp = agenda.listAppointmentTypesHttp;
+export const listPaidInvoicesForToday = billing.listPaidInvoicesForToday;
+export const getInvoiceById = billing.getInvoiceById;
+export const updateInvoice = billing.updateInvoice;
+export const listPaidInvoicesForTodayHttp = billing.listPaidInvoicesForTodayHttp;
+export const getInvoiceByIdHttp = billing.getInvoiceByIdHttp;
+export const updateInvoiceHttp = billing.updateInvoiceHttp;
 
 // Callable: getPatientEhr
 export const getPatientEhr = functions.https.onCall(async (data: any, context: any) => {

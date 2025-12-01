@@ -13,22 +13,44 @@ function hashCode(code: string, secret: string) {
 }
 
 async function sendEmail(to: string, subject: string, text: string) {
-  // In emulator/dev we might not have SMTP configured. If an SMTP URL is provided
-  // in ADMIN_2FA_SMTP_URL, attempt to send via nodemailer. Otherwise just log.
+  // Always log the email body to console for dev/emulator so developer can see the code.
+  console.info('[admin2fa] (log) email', { to, subject, text });
+
+  // Try to send via SMTP if configuration is available. Support two ways to configure:
+  // 1) ADMIN_2FA_SMTP_URL (single connection URL, e.g. smtp://user:pass@host:port)
+  // 2) SMTP_HOST + SMTP_USER + SMTP_PASSWORD (+ optional SMTP_PORT, SMTP_SECURE)
   const smtpUrl = process.env.ADMIN_2FA_SMTP_URL;
-  if (!smtpUrl) {
-    console.info('[admin2fa] No SMTP configured, logging code to console (dev/emulator):', { to, subject, text });
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  if (!smtpUrl && !(smtpHost && smtpUser && smtpPass)) {
+    // no SMTP configuration found — leave only the console log
     return;
   }
+
   try {
-    // Import lazily so production only installs nodemailer when needed
+    // Lazy require so functions without nodemailer still load until send is needed
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport(smtpUrl);
+    let transporter: any = null;
+    if (smtpUrl) {
+      transporter = nodemailer.createTransport(String(smtpUrl));
+    } else {
+      const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
+      const secure = (process.env.SMTP_SECURE === 'true');
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: port,
+        secure: !!secure,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    }
+
+    // send mail
     await transporter.sendMail({ from: process.env.ADMIN_2FA_FROM || 'no-reply@example.com', to, subject, text });
     console.info('[admin2fa] Email sent to', to);
-  } catch (e) {
-    console.warn('[admin2fa] Failed to send email, falling back to console log', e);
+  } catch (e: any) {
+    console.warn('[admin2fa] Failed to send email via SMTP (nodemailer). Falling back to console log', e && e.message ? e.message : String(e));
     console.info('[admin2fa] Email fallback log:', { to, subject, text });
   }
 }
@@ -43,6 +65,8 @@ export const requestAdmin2FA = functions.https.onCall(async (data: any, context:
   const code = generateCode();
   const secret = process.env.ADMIN_2FA_SECRET || 'dev-secret';
   const codeHash = hashCode(code, secret);
+  // Always log the generated code and uid to ensure developers can see it in emulator logs
+  console.info('[admin2fa] generated code', { uid, code });
   const now = Date.now();
   const doc = {
     uid,
@@ -144,6 +168,8 @@ export const requestAdmin2FAHttp = functions.https.onRequest(async (req, res) =>
     const code = generateCode();
     const secret = process.env.ADMIN_2FA_SECRET || 'dev-secret';
     const codeHash = hashCode(code, secret);
+  // Always log the generated code and uid so it appears in emulator logs (HTTP fallback)
+  console.info('[admin2fa:http] generated code', { uid: decoded.uid, code });
     const now = Date.now();
     const doc = { uid: decoded.uid, codeHash, used: false, createdAt: now, expiresAt: now + CODE_TTL_MS } as any;
     await db.collection('admin2fa').add(doc);

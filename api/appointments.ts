@@ -1,59 +1,78 @@
-import { mockAppointments, mockInvoices, mockPatients } from './mockData';
-import { type Appointment, AppointmentType, Patient, User } from '../types';
-import { createInvoiceForAppointment } from './billing';
+import { type Appointment, type AppointmentType, type Patient, type User } from '../types';
+import { callBackendFunction } from './functionsClient';
+
+const normalizePatient = (raw: any): Patient => ({
+    id: String(raw?.id || ''),
+    firstName: String(raw?.firstName || ''),
+    lastName: String(raw?.lastName || ''),
+    dob: String(raw?.dob || ''),
+    gender: raw?.gender === 'male' || raw?.gender === 'female' || raw?.gender === 'other' ? raw.gender : 'other',
+    idNumber: String(raw?.idNumber || ''),
+    contactInfo: {
+        email: String(raw?.contactInfo?.email || ''),
+        phone: String(raw?.contactInfo?.phone || ''),
+        address: String(raw?.contactInfo?.address || ''),
+    },
+    insuranceInfo: Array.isArray(raw?.insuranceInfo) ? raw.insuranceInfo : [],
+    allergies: Array.isArray(raw?.allergies) ? raw.allergies : [],
+    chronicConditions: Array.isArray(raw?.chronicConditions) ? raw.chronicConditions : [],
+    avatarUrl: raw?.avatarUrl || undefined,
+});
+
+const normalizeUser = (raw: any): User => ({
+    id: String(raw?.id || ''),
+    name: String(raw?.name || ''),
+    email: String(raw?.email || ''),
+    role: raw?.role || 'doctor',
+    avatarUrl: raw?.avatarUrl || undefined,
+    phone: raw?.phone || undefined,
+    isActive: raw?.isActive !== undefined ? !!raw.isActive : true,
+});
+
+const normalizeAppointmentType = (raw: any): AppointmentType => ({
+    id: String(raw?.id || ''),
+    name: String(raw?.name || ''),
+    durationMinutes: Number.isFinite(raw?.durationMinutes) ? Number(raw.durationMinutes) : 30,
+    price: Number.isFinite(raw?.price) ? Number(raw.price) : 0,
+    description: String(raw?.description || ''),
+});
+
+const normalizeAppointment = (raw: any): Appointment => {
+    const start = raw?.startTime ? new Date(raw.startTime).toISOString() : new Date().toISOString();
+    const end = raw?.endTime ? new Date(raw.endTime).toISOString() : start;
+    return {
+        id: String(raw?.id || ''),
+        patient: normalizePatient(raw?.patient || {}),
+        doctor: normalizeUser(raw?.doctor || {}),
+        startTime: start,
+        endTime: end,
+        status: raw?.status || 'confirmed',
+        type: normalizeAppointmentType(raw?.type || {}),
+        checkinTime: raw?.checkinTime ? new Date(raw.checkinTime).toISOString() : undefined,
+        notes: raw?.notes || undefined,
+        associatedInvoiceId: raw?.associatedInvoiceId || undefined,
+    };
+};
 
 export const fetchAppointmentsForToday = async (): Promise<Appointment[]> => {
-  console.log("Fetching today's appointments...");
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-  
-  // In a real app, you would filter by date on the backend.
-  // Here we just return all mock appointments for demonstration.
-  console.log("Appointments fetched:", mockAppointments);
-  return mockAppointments;
+    const result = await callBackendFunction<{ appointments?: any[] }>('listAgendaAppointments', { date: new Date().toISOString() });
+    return (result.appointments || []).map(normalizeAppointment);
 };
 
 export const fetchAppointmentsForPatient = async (patientId: string): Promise<Appointment[]> => {
-    console.log(`Fetching appointments for patient ${patientId}...`);
-    await new Promise(resolve => setTimeout(resolve, 600));
-    const appointments = mockAppointments.filter(a => a.patient.id === patientId);
-    console.log(`Found ${appointments.length} appointments for patient ${patientId}`);
-    return appointments;
-}
+    const result = await callBackendFunction<{ appointments?: any[] }>('getAppointmentsForPatient', { patientId });
+    return (result.appointments || []).map(normalizeAppointment);
+};
 
 export const getAppointmentById = async (appointmentId: string): Promise<Appointment | undefined> => {
-    console.log(`Fetching appointment ${appointmentId}...`);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const appointment = mockAppointments.find(a => a.id === appointmentId);
-    console.log("Appointment fetched:", appointment);
-    return appointment;
-}
+    const result = await callBackendFunction<{ appointment?: any }>('getAppointmentById', { appointmentId });
+    return result.appointment ? normalizeAppointment(result.appointment) : undefined;
+};
 
-// In a real app, this would be a PATCH request
 export const updateAppointmentStatus = async (appointmentId: string, status: Appointment['status']): Promise<Appointment | undefined> => {
-    console.log(`Updating appointment ${appointmentId} to status ${status}`);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const appointment = mockAppointments.find(a => a.id === appointmentId);
-    if(appointment) {
-        appointment.status = status;
-        
-        // If checking in, record the time
-        if (status === 'checked_in') {
-            appointment.checkinTime = new Date().toISOString();
-        }
-
-        // If consultation is finished, ensure an invoice exists
-        if (status === 'attended_pending_payment' && !appointment.associatedInvoiceId) {
-            console.log(`No invoice found for appointment ${appointmentId}. Creating one.`);
-            const newInvoice = createInvoiceForAppointment(appointment);
-            mockInvoices.push(newInvoice);
-            appointment.associatedInvoiceId = newInvoice.id;
-            console.log(`Created and associated invoice ${newInvoice.id}`);
-        }
-
-        return appointment;
-    }
-    return undefined;
-}
+    const result = await callBackendFunction<{ appointment?: any }>('updateAppointmentStatus', { appointmentId, status });
+    return result.appointment ? normalizeAppointment(result.appointment) : undefined;
+};
 
 export interface NewAppointmentData {
     patient: Patient;
@@ -64,18 +83,17 @@ export interface NewAppointmentData {
 }
 
 export const createAppointment = async (appointmentData: NewAppointmentData): Promise<Appointment> => {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    const startTime = new Date(appointmentData.startTime);
-    const endTime = new Date(startTime.getTime() + appointmentData.type.durationMinutes * 60000);
-
-    const newAppointment: Appointment = {
-        ...appointmentData,
-        id: `apt-${mockAppointments.length + 1 + Math.random()}`,
-        endTime: endTime.toISOString(),
-        status: 'confirmed', // Default to confirmed for new appointments via modal
+    const payload = {
+        patientId: appointmentData.patient.id,
+        doctorId: appointmentData.doctor.id,
+        typeId: appointmentData.type.id,
+        startTime: appointmentData.startTime,
+        notes: appointmentData.notes || null,
     };
-    mockAppointments.push(newAppointment);
-    console.log("Created new appointment:", newAppointment);
-    return newAppointment;
-}
+
+    const result = await callBackendFunction<{ appointment?: any }>('createAppointment', payload);
+    if (!result.appointment) {
+        throw new Error('No se pudo crear la cita.');
+    }
+    return normalizeAppointment(result.appointment);
+};

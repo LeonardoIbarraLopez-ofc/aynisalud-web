@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addEhrEvent = exports.getPatientEhr = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.addEhrEvent = exports.getPatientEhr = exports.updateInvoiceHttp = exports.getInvoiceByIdHttp = exports.listPaidInvoicesForTodayHttp = exports.updateInvoice = exports.getInvoiceById = exports.listPaidInvoicesForToday = exports.listAppointmentTypesHttp = exports.listDoctorsHttp = exports.createQuickPatientHttp = exports.searchPatientsHttp = exports.updateAppointmentStatusHttp = exports.createAppointmentHttp = exports.getAppointmentByIdHttp = exports.getAppointmentsForPatientHttp = exports.listAgendaAppointmentsHttp = exports.listAppointmentTypes = exports.listDoctors = exports.createQuickPatient = exports.searchPatients = exports.updateAppointmentStatus = exports.createAppointment = exports.getAppointmentById = exports.getAppointmentsForPatient = exports.listAgendaAppointments = exports.verifyPasswordResetHttp = exports.requestPasswordResetHttp = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const uuid_1 = require("uuid");
@@ -48,6 +48,9 @@ if (!admin.apps || admin.apps.length === 0) {
 // so the Functions emulator detects them as top-level exports.
 const users = require('./users');
 const admin2fa = require('./admin2fa');
+const passwordReset = require('./passwordReset');
+const agenda = require('./agenda');
+const billing = require('./billing');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 exports.createUserAdmin = users.createUserAdmin;
@@ -60,6 +63,32 @@ exports.requestAdmin2FA = admin2fa.requestAdmin2FA;
 exports.verifyAdmin2FA = admin2fa.verifyAdmin2FA;
 exports.requestAdmin2FAHttp = admin2fa.requestAdmin2FAHttp;
 exports.verifyAdmin2FAHttp = admin2fa.verifyAdmin2FAHttp;
+exports.requestPasswordResetHttp = passwordReset.requestPasswordResetHttp;
+exports.verifyPasswordResetHttp = passwordReset.verifyPasswordResetHttp;
+exports.listAgendaAppointments = agenda.listAgendaAppointments;
+exports.getAppointmentsForPatient = agenda.getAppointmentsForPatient;
+exports.getAppointmentById = agenda.getAppointmentById;
+exports.createAppointment = agenda.createAppointment;
+exports.updateAppointmentStatus = agenda.updateAppointmentStatus;
+exports.searchPatients = agenda.searchPatients;
+exports.createQuickPatient = agenda.createQuickPatient;
+exports.listDoctors = agenda.listDoctors;
+exports.listAppointmentTypes = agenda.listAppointmentTypes;
+exports.listAgendaAppointmentsHttp = agenda.listAgendaAppointmentsHttp;
+exports.getAppointmentsForPatientHttp = agenda.getAppointmentsForPatientHttp;
+exports.getAppointmentByIdHttp = agenda.getAppointmentByIdHttp;
+exports.createAppointmentHttp = agenda.createAppointmentHttp;
+exports.updateAppointmentStatusHttp = agenda.updateAppointmentStatusHttp;
+exports.searchPatientsHttp = agenda.searchPatientsHttp;
+exports.createQuickPatientHttp = agenda.createQuickPatientHttp;
+exports.listDoctorsHttp = agenda.listDoctorsHttp;
+exports.listAppointmentTypesHttp = agenda.listAppointmentTypesHttp;
+exports.listPaidInvoicesForToday = billing.listPaidInvoicesForToday;
+exports.getInvoiceById = billing.getInvoiceById;
+exports.updateInvoice = billing.updateInvoice;
+exports.listPaidInvoicesForTodayHttp = billing.listPaidInvoicesForTodayHttp;
+exports.getInvoiceByIdHttp = billing.getInvoiceByIdHttp;
+exports.updateInvoiceHttp = billing.updateInvoiceHttp;
 // Callable: getPatientEhr
 exports.getPatientEhr = functions.https.onCall(async (data, context) => {
     const { uid, token } = await (0, utils_1.requireAuth)(context, data);

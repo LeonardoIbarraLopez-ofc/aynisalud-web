@@ -15,9 +15,26 @@ export const login = async (email: string, password: string): Promise<User | und
           // Use a simple GET + query param for local emulator fallback to avoid CORS preflight
           // (no custom headers => no OPTIONS). For local/dev only.
           const host = window.location.hostname || 'localhost';
-          const url = `http://${host}:5002/local-aynialud/us-central1/getMyProfileHttp?idToken=${encodeURIComponent(idToken)}`;
-          console.info('[auth] Using local HTTP profile fallback', url);
-          const resp = await fetch(url, { method: 'GET' });
+          // localHttpGet will try common emulator ports (5002 then 5001) and return
+          // the first successful response. This avoids hard-failing if the functions
+          // emulator started on a different port.
+          const localHttpGet = async (path: string) => {
+            const ports = [5002, 5001];
+            for (const port of ports) {
+              const url = `http://${host}:${port}${path}`;
+              try {
+                console.info('[auth] trying local HTTP fallback', url);
+                const resp = await fetch(url, { method: 'GET' });
+                if (resp && resp.ok) return resp;
+                console.warn('[auth] local fallback responded with status', resp && resp.status, url);
+              } catch (err) {
+                console.warn('[auth] local fallback fetch failed', url, err);
+              }
+            }
+            throw new Error('Local HTTP fallback failed for all ports');
+          };
+
+          const resp = await localHttpGet(`/local-aynialud/us-central1/getMyProfileHttp?idToken=${encodeURIComponent(idToken)}`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const data = await resp.json();
           if (data && (data as any).profile) {
@@ -27,9 +44,7 @@ export const login = async (email: string, password: string): Promise<User | und
               try {
                 // Use HTTP GET fallback to avoid preflight on localhost
                 const idTokenLocal = await cred.user.getIdToken();
-                const reqUrl = `http://${host}:5002/local-aynialud/us-central1/requestAdmin2FAHttp?idToken=${encodeURIComponent(idTokenLocal)}`;
-                console.info('[auth] requesting admin 2FA via HTTP fallback', reqUrl);
-                const r = await fetch(reqUrl, { method: 'GET' });
+                const r = await localHttpGet(`/local-aynialud/us-central1/requestAdmin2FAHttp?idToken=${encodeURIComponent(idTokenLocal)}`);
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 // prompt loop for code verification
                 let verified = false;
@@ -37,8 +52,7 @@ export const login = async (email: string, password: string): Promise<User | und
                   const code = window.prompt('Ingrese el código enviado a su correo (admin 2FA):');
                   if (!code) break;
                   try {
-                    const vurl = `http://${host}:5002/local-aynialud/us-central1/verifyAdmin2FAHttp?idToken=${encodeURIComponent(idTokenLocal)}&code=${encodeURIComponent(code)}`;
-                    const vr = await fetch(vurl, { method: 'GET' });
+                    const vr = await localHttpGet(`/local-aynialud/us-central1/verifyAdmin2FAHttp?idToken=${encodeURIComponent(idTokenLocal)}&code=${encodeURIComponent(code)}`);
                     if (!vr.ok) throw new Error(`HTTP ${vr.status}`);
                     const vdata = await vr.json();
                     if (vdata && vdata.success) { verified = true; break; }

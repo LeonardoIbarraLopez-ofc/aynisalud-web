@@ -14,6 +14,7 @@ export interface PaymentDetails {
 export interface Invoice {
   id: string;
   patientId: string;
+  appointmentId?: string;
   date: string;
   dueDate: string;
   status: 'draft' | 'sent' | 'paid' | 'overdue';
@@ -22,4 +23,5 @@ export interface Invoice {
   tax: number;
   total: number;
   paymentDetails?: PaymentDetails[];
+  lastPaymentAt?: string | null;
 }

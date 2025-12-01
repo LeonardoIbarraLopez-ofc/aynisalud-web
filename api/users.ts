@@ -1,7 +1,17 @@
-import { mockUsers } from './mockData';
 import { type User } from '../types';
+import { callBackendFunction } from './functionsClient';
+
+const normalizeUser = (raw: any): User => ({
+  id: String(raw?.id || ''),
+  name: String(raw?.name || ''),
+  email: String(raw?.email || ''),
+  role: raw?.role || 'doctor',
+  avatarUrl: raw?.avatarUrl || undefined,
+  phone: raw?.phone || undefined,
+  isActive: raw?.isActive !== undefined ? !!raw.isActive : true,
+});
 
 export const getDoctors = async (): Promise<User[]> => {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return mockUsers.filter(u => u.role === 'doctor' || u.role === 'specialist');
+  const data = await callBackendFunction<{ doctors?: any[] }>('listDoctors', {});
+  return (data?.doctors || []).map(normalizeUser);
 };

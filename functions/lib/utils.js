@@ -40,6 +40,9 @@ exports.isAdmin = isAdmin;
 exports.isClinician = isClinician;
 exports.auditLog = auditLog;
 exports.createAuthUser = createAuthUser;
+exports.getServerTimestamp = getServerTimestamp;
+exports.sanitizeForFirestore = sanitizeForFirestore;
+exports.toIsoString = toIsoString;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 // Ensure the admin SDK is initialized as early as possible. Many modules
@@ -165,4 +168,68 @@ async function auditLog(actorUid, action, targetCollection, targetId, details = 
 async function createAuthUser(email, password) {
     const u = await admin.auth().createUser({ email, password });
     return u;
+}
+function getServerTimestamp() {
+    const fieldValue = admin.firestore?.FieldValue;
+    if (fieldValue && typeof fieldValue.serverTimestamp === 'function') {
+        return fieldValue.serverTimestamp();
+    }
+    return new Date();
+}
+function sanitizeForFirestore(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (value === null) {
+        return null;
+    }
+    if (Array.isArray(value)) {
+        const sanitizedArray = value
+            .map(item => sanitizeForFirestore(item))
+            .filter(item => item !== undefined);
+        return sanitizedArray;
+    }
+    if (typeof value === 'object') {
+        if (!value) {
+            return value;
+        }
+        const ctorName = value?.constructor?.name || '';
+        if (ctorName.includes('FieldValue')) {
+            return value;
+        }
+        if (typeof value?.toDate === 'function' && typeof value?.toMillis === 'function') {
+            return value;
+        }
+        const result = {};
+        for (const [key, val] of Object.entries(value)) {
+            const sanitized = sanitizeForFirestore(val);
+            if (sanitized !== undefined) {
+                result[key] = sanitized;
+            }
+        }
+        return result;
+    }
+    return value;
+}
+function toIsoString(value) {
+    if (!value)
+        return undefined;
+    if (value && typeof value.toDate === 'function') {
+        try {
+            return value.toDate().toISOString();
+        }
+        catch (e) {
+            // ignore invalid timestamp conversion
+        }
+    }
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString();
+        }
+    }
+    return undefined;
 }

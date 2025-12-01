@@ -3,7 +3,7 @@ import Modal from '../../common/Modal';
 import { Spinner } from '../../common/Spinner';
 import { type Appointment, type Invoice, type PaymentDetails } from '../../../types';
 import { getInvoiceById, updateInvoice } from '../../../api/billing';
-import { updateAppointmentStatus } from '../../../api/appointments';
+import { updateAppointmentStatus, getAppointmentById } from '../../../api/appointments';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -21,33 +21,79 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, appointm
   const [payments, setPayments] = useState<PaymentDetails[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentDetails['method']>('Efectivo');
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [totalDueInput, setTotalDueInput] = useState('0');
 
   useEffect(() => {
-    if (isOpen && appointment.associatedInvoiceId) {
-      setIsLoading(true);
-      setError(null);
-      setPayments([]);
-      getInvoiceById(appointment.associatedInvoiceId)
-        .then(inv => {
-          if (inv) {
-            setInvoice(inv);
-            setPayments(inv.paymentDetails || []);
-          } else {
+    if (!isOpen) {
+      return;
+    }
+
+    let active = true;
+    setIsLoading(true);
+    setError(null);
+    setInvoice(null);
+    setPayments([]);
+    setPaymentAmount('');
+    setTotalDueInput('0');
+
+    (async () => {
+      try {
+        let invoiceId = appointment.associatedInvoiceId;
+        if (!invoiceId) {
+          const refreshed = await getAppointmentById(appointment.id);
+          invoiceId = refreshed?.associatedInvoiceId;
+        }
+
+        if (!invoiceId) {
+          if (active) {
+            setError('No se encontró una factura asociada a la cita.');
+          }
+          return;
+        }
+
+        const inv = await getInvoiceById(invoiceId);
+        if (!inv) {
+          if (active) {
             setError('No se pudo encontrar la factura asociada.');
           }
-        })
-        .catch(() => setError('Error al cargar la factura.'))
-        .finally(() => setIsLoading(false));
-    }
+          return;
+        }
+
+        if (!active) return;
+
+        setInvoice(inv);
+        setPayments(inv.paymentDetails || []);
+        setTotalDueInput(((Number.isFinite(inv.total) ? inv.total : 0) || 0).toFixed(2));
+      } catch (err) {
+        console.error('[CheckoutModal] error loading invoice', err);
+        if (active) {
+          setError('Error al cargar la factura.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, appointment]);
 
+  const totalDue = useMemo(() => {
+    const parsed = parseFloat(totalDueInput.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return parsed;
+  }, [totalDueInput]);
+
   const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
-  const balanceDue = useMemo(() => (invoice?.total ?? 0) - totalPaid, [invoice, totalPaid]);
+  const balanceDue = useMemo(() => Math.max(0, totalDue - totalPaid), [totalDue, totalPaid]);
 
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(paymentAmount);
-    if (!amount || amount <= 0 || amount > balanceDue) {
+    const amount = parseFloat(paymentAmount.replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balanceDue + 0.01) {
       alert('Por favor ingrese un monto válido.');
       return;
     }
@@ -64,22 +110,29 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, appointm
       setPayments(prev => prev.filter((_, i) => i !== index));
   }
 
-  const handleFinalizeCheckout = async (payLater: boolean = false) => {
+    const handleFinalizeCheckout = async (payLater: boolean = false) => {
       if (!invoice) return;
       setIsSubmitting(true);
       setError(null);
       try {
-          const invoiceStatus = payLater ? 'sent' : 'paid';
-          await updateInvoice(invoice.id, { status: invoiceStatus, payments });
-          await updateAppointmentStatus(appointment.id, 'completed');
-          onCheckoutComplete();
+        const normalizedTotal = Math.max(0, Number.parseFloat(totalDue.toFixed(2)));
+        const invoiceStatus = payLater ? 'sent' : 'paid';
+        await updateInvoice(invoice.id, {
+          status: invoiceStatus,
+          payments,
+          subtotal: normalizedTotal,
+          tax: 0,
+          total: normalizedTotal,
+        });
+        await updateAppointmentStatus(appointment.id, 'completed');
+        onCheckoutComplete();
       } catch (err) {
-          setError('Ocurrió un error al procesar el pago. Por favor, intente de nuevo.');
-          console.error(err);
+        setError('Ocurrió un error al procesar el pago. Por favor, intente de nuevo.');
+        console.error(err);
       } finally {
-          setIsSubmitting(false);
+        setIsSubmitting(false);
       }
-  }
+    }
 
   const renderContent = () => {
     if (isLoading) {
@@ -96,12 +149,23 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, appointm
       <div className="space-y-4">
         <div>
           <p className="font-semibold text-lg">{appointment.patient.firstName} {appointment.patient.lastName}</p>
-          <p className="text-sm text-gray-600">{invoice.items[0].description}</p>
+            <p className="text-sm text-gray-600">{invoice.items[0]?.description || 'Servicio sin descripción'}</p>
         </div>
 
         <div className="p-4 bg-slate-100 rounded-lg text-center">
             <p className="text-sm text-gray-500">MONTO TOTAL</p>
-            <p className="text-4xl font-bold text-gray-800">Bs. {invoice.total.toFixed(2)}</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="text-2xl font-bold text-gray-700">Bs.</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={totalDueInput}
+                onChange={e => setTotalDueInput(e.target.value)}
+                className="w-32 text-center text-3xl font-bold text-gray-800 bg-white border border-gray-300 rounded-md px-2 py-1"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Establece el monto a cobrar para esta consulta.</p>
         </div>
         
         {/* Payment List */}
@@ -121,13 +185,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, appointm
         </div>
 
         {/* Balance */}
-        <div className={`p-3 rounded-lg text-center ${balanceDue > 0 ? 'bg-yellow-100' : 'bg-green-100'}`}>
+        <div className={`p-3 rounded-lg text-center ${balanceDue > 0.01 ? 'bg-yellow-100' : 'bg-green-100'}`}>
             <p className="text-sm font-medium">{balanceDue > 0 ? 'SALDO PENDIENTE' : 'COMPLETADO'}</p>
-            <p className="text-2xl font-bold">{balanceDue > 0 ? `Bs. ${balanceDue.toFixed(2)}` : 'Bs. 0.00'}</p>
+          <p className="text-2xl font-bold">{balanceDue > 0.01 ? `Bs. ${balanceDue.toFixed(2)}` : 'Bs. 0.00'}</p>
         </div>
 
         {/* Add Payment Form */}
-        {balanceDue > 0 && (
+        {balanceDue > 0.01 && (
             <form onSubmit={handleAddPayment} className="grid grid-cols-3 gap-2 p-3 border rounded-md">
                 <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as PaymentDetails['method'])} className="col-span-1 p-2 border rounded-md">
                     <option>Efectivo</option>
@@ -161,13 +225,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, appointm
             <div className="flex justify-between items-center pt-4 border-t mt-6">
                 <button 
                     onClick={() => handleFinalizeCheckout(true)}
-                    disabled={isSubmitting || balanceDue <= 0}
+                    disabled={isSubmitting || balanceDue <= 0.01}
                     className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
                     {isSubmitting ? 'Procesando...' : 'Pagar Después'}
                 </button>
                 <button 
                     onClick={() => handleFinalizeCheckout(false)} 
-                    disabled={isSubmitting || balanceDue > 0} 
+                    disabled={isSubmitting || balanceDue > 0.01} 
                     className="bg-teal-500 text-white px-4 py-2 rounded-md hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
                      {isSubmitting ? 'Procesando...' : 'Confirmar Pago'}
                 </button>

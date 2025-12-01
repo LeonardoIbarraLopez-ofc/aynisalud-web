@@ -1,7 +1,15 @@
-import { mockAppointmentTypes } from './mockData';
 import { type AppointmentType } from '../types';
+import { callBackendFunction } from './functionsClient';
+
+const normalizeAppointmentType = (raw: any): AppointmentType => ({
+    id: String(raw?.id || ''),
+    name: String(raw?.name || ''),
+    durationMinutes: Number.isFinite(raw?.durationMinutes) ? Number(raw.durationMinutes) : 30,
+    price: Number.isFinite(raw?.price) ? Number(raw.price) : 0,
+    description: String(raw?.description || ''),
+});
 
 export const getAppointmentTypes = async (): Promise<AppointmentType[]> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return mockAppointmentTypes;
-}
+    const data = await callBackendFunction<{ appointmentTypes?: any[] }>('listAppointmentTypes', {});
+    return (data?.appointmentTypes || []).map(normalizeAppointmentType);
+};

@@ -120,3 +120,68 @@ export async function createAuthUser(email: string, password?: string) {
   const u = await admin.auth().createUser({ email, password });
   return u;
 }
+
+export function getServerTimestamp() {
+  const fieldValue = (admin.firestore as any)?.FieldValue;
+  if (fieldValue && typeof fieldValue.serverTimestamp === 'function') {
+    return fieldValue.serverTimestamp();
+  }
+  return new Date();
+}
+
+export function sanitizeForFirestore(value: any): any {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    const sanitizedArray = value
+      .map(item => sanitizeForFirestore(item))
+      .filter(item => item !== undefined);
+    return sanitizedArray;
+  }
+  if (typeof value === 'object') {
+    if (!value) {
+      return value;
+    }
+    const ctorName = (value as any)?.constructor?.name || '';
+    if (ctorName.includes('FieldValue')) {
+      return value;
+    }
+    if (typeof (value as any)?.toDate === 'function' && typeof (value as any)?.toMillis === 'function') {
+      return value;
+    }
+    const result: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      const sanitized = sanitizeForFirestore(val);
+      if (sanitized !== undefined) {
+        result[key] = sanitized;
+      }
+    }
+    return result;
+  }
+  return value;
+}
+
+export function toIsoString(value: any): string | undefined {
+  if (!value) return undefined;
+  if (value && typeof value.toDate === 'function') {
+    try {
+      return value.toDate().toISOString();
+    } catch (e) {
+      // ignore invalid timestamp conversion
+    }
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return undefined;
+}
