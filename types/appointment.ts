@@ -22,7 +22,9 @@ export interface AppointmentType {
 export interface Appointment {
   id: string;
   patient: Patient;
+  patientId?: string;
   doctor: User;
+  doctorId?: string;
   startTime: string; // ISO String
   endTime: string; // ISO String
   status: AppointmentStatus;

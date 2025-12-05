@@ -3,13 +3,21 @@ import {
     type AddEhrEventPayload,
     type ClinicalSnapshotItem,
     type ClinicalTimelineEvent,
+    type ConsultationDocument,
     type EHR,
     type EhrStats,
+    type LabOrder,
+    type LabResult,
     type Patient,
     type Prescription,
-    type LabOrder,
     type VitalSign,
 } from '../types';
+
+const generateLocalId = (prefix: string): string => {
+    const hasCrypto = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function';
+    if (hasCrypto) return `${prefix}-${crypto.randomUUID()}`;
+    return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+};
 
 const normalizePatient = (raw: any): Patient => ({
     id: String(raw?.id || raw?.patientId || ''),
@@ -41,6 +49,56 @@ const normalizeSnapshotItem = (raw: any): ClinicalSnapshotItem => ({
     tags: Array.isArray(raw?.tags) ? raw.tags.map((tag: any) => String(tag)) : undefined,
 });
 
+const normalizePrescription = (raw: any): Prescription => ({
+    id: String(raw?.id || generateLocalId('prescription')),
+    medicationName: String(raw?.medicationName || ''),
+    dosage: raw?.dosage ? String(raw.dosage) : '',
+    frequency: raw?.frequency ? String(raw.frequency) : '',
+    duration: raw?.duration ? String(raw.duration) : '',
+});
+
+const normalizeLabOrder = (raw: any): LabOrder => ({
+    id: String(raw?.id || generateLocalId('lab-order')),
+    testName: String(raw?.testName || ''),
+    details: raw?.details ? String(raw.details) : '',
+});
+
+const normalizeLabResult = (raw: any): LabResult => ({
+    id: String(raw?.id || generateLocalId('lab-result')),
+    testName: String(raw?.testName || ''),
+    resultValue: raw?.resultValue ? String(raw.resultValue) : undefined,
+    unit: raw?.unit ? String(raw.unit) : undefined,
+    referenceRange: raw?.referenceRange ? String(raw.referenceRange) : undefined,
+    interpretation: raw?.interpretation ? String(raw.interpretation) : undefined,
+    notes: raw?.notes ? String(raw.notes) : undefined,
+});
+
+const normalizeDocument = (raw: any): ConsultationDocument => ({
+    id: String(raw?.id || generateLocalId('doc')),
+    title: String(raw?.title || ''),
+    url: raw?.url ? String(raw.url) : undefined,
+    description: raw?.description ? String(raw.description) : undefined,
+    type: raw?.type ? String(raw.type) : undefined,
+});
+
+const normalizeTimelineMetadata = (rawMeta: any = {}): Record<string, unknown> | undefined => {
+    if (!rawMeta || typeof rawMeta !== 'object') return undefined;
+    const metadata: Record<string, unknown> = { ...rawMeta };
+    if (Array.isArray(rawMeta.prescriptions)) {
+        metadata.prescriptions = rawMeta.prescriptions.map(normalizePrescription);
+    }
+    if (Array.isArray(rawMeta.labOrders)) {
+        metadata.labOrders = rawMeta.labOrders.map(normalizeLabOrder);
+    }
+    if (Array.isArray(rawMeta.labResults)) {
+        metadata.labResults = rawMeta.labResults.map(normalizeLabResult);
+    }
+    if (Array.isArray(rawMeta.attachments)) {
+        metadata.attachments = rawMeta.attachments.map(normalizeDocument);
+    }
+    return metadata;
+};
+
 const normalizeTimelineEvent = (raw: any): ClinicalTimelineEvent => ({
     id: String(raw?.id || ''),
     type: ['ConsultationNote', 'LabResult', 'Prescription', 'ImageStudy', 'Procedure', 'Vital', 'Document'].includes(
@@ -53,7 +111,7 @@ const normalizeTimelineEvent = (raw: any): ClinicalTimelineEvent => ({
     summary: String(raw?.summary || ''),
     actor: String(raw?.actor || 'Profesional de salud'),
     tags: Array.isArray(raw?.tags) ? raw.tags.map((tag: any) => String(tag)) : undefined,
-    metadata: raw?.metadata && typeof raw.metadata === 'object' ? raw.metadata : undefined,
+    metadata: normalizeTimelineMetadata(raw?.metadata),
 });
 
 const normalizeStats = (raw: any | undefined): EhrStats | undefined => {
@@ -104,6 +162,8 @@ export const fetchMyEhr = async (): Promise<PatientEhrResponse> => {
 
 type PartialPrescription = Partial<Prescription> & { medicationName: string };
 type PartialLabOrder = Partial<LabOrder> & { testName: string };
+type PartialLabResult = Partial<LabResult> & { testName: string };
+type PartialDocument = Partial<ConsultationDocument> & { title: string };
 type PartialVital = Partial<VitalSign> & { name: string; value: string };
 
 export interface CreateConsultationNoteInput {
@@ -115,6 +175,8 @@ export interface CreateConsultationNoteInput {
     soapNote?: AddEhrEventPayload['event']['soapNote'];
     prescriptions?: PartialPrescription[];
     labOrders?: PartialLabOrder[];
+    labResults?: PartialLabResult[];
+    documents?: PartialDocument[];
     vitals?: PartialVital[];
     tags?: string[];
     performedAt?: string;
@@ -138,7 +200,21 @@ export const addEhrEvent = async (payload: AddEhrEventPayload): Promise<{ eventI
 export const createConsultationNote = async (
     input: CreateConsultationNoteInput,
 ): Promise<{ eventId: string; patientId: string }> => {
-    const { patientId, appointmentId, status = 'final', title, summary, soapNote, prescriptions, labOrders, vitals, tags, performedAt } = input;
+    const {
+        patientId,
+        appointmentId,
+        status = 'final',
+        title,
+        summary,
+        soapNote,
+        prescriptions,
+        labOrders,
+        labResults,
+        documents,
+        vitals,
+        tags,
+        performedAt,
+    } = input;
 
     const eventPayload: AddEhrEventPayload = {
         patientId,
@@ -151,6 +227,8 @@ export const createConsultationNote = async (
             soapNote,
             prescriptions,
             labOrders,
+            labResults,
+            documents,
             vitals,
             tags,
             performedAt,

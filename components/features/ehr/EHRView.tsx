@@ -20,7 +20,12 @@ const EHRView: React.FC<EHRViewProps> = ({ appointment, onConsultationEnd }) => 
   const loadEHR = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { ehr, patient } = await fetchEHRByPatientId(appointment.patient.id);
+      const targetPatientId = appointment.patientId || appointment.patient.id;
+      if (!targetPatientId) {
+        throw new Error('La cita no contiene un identificador de paciente.');
+      }
+
+      const { ehr, patient } = await fetchEHRByPatientId(targetPatientId);
       setEhrData(ehr);
       setPatientData(patient);
       setError(null);
@@ -30,7 +35,7 @@ const EHRView: React.FC<EHRViewProps> = ({ appointment, onConsultationEnd }) => 
     } finally {
       setIsLoading(false);
     }
-  }, [appointment.patient.id]);
+  }, [appointment.patient.id, appointment.patientId]);
 
   useEffect(() => {
     loadEHR();
@@ -60,6 +65,7 @@ const EHRView: React.FC<EHRViewProps> = ({ appointment, onConsultationEnd }) => 
         <ClinicalNoteEditor 
             appointment={appointment} 
             patient={patientData}
+          patientId={ehrData.patientId}
           onFinalize={onConsultationEnd}
           onEventCreated={handleEventCreated} 
         />

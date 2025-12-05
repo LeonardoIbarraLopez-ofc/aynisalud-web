@@ -1,18 +1,28 @@
 import React, { useState } from 'react';
-import { type Appointment, type Patient, type Prescription, type LabOrder } from '../../../types';
+import {
+    type Appointment,
+    type Patient,
+    type Prescription,
+    type LabOrder,
+    type LabResult,
+    type ConsultationDocument,
+} from '../../../types';
 import { updateAppointmentStatus } from '../../../api/appointments';
 import { createConsultationNote } from '../../../api/ehr';
 import PrescriptionModal from './PrescriptionModal';
 import LabOrderModal from './LabOrderModal';
+import LabResultModal from './LabResultModal';
+import DocumentModal from './DocumentModal';
 
 interface ClinicalNoteEditorProps {
     appointment: Appointment;
     patient: Patient;
+    patientId?: string;
     onFinalize: () => void;
     onEventCreated?: (eventId: string) => Promise<void> | void;
 }
 
-const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, patient, onFinalize, onEventCreated }) => {
+const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, patient, patientId: patientIdProp, onFinalize, onEventCreated }) => {
     const [isNoteStarted, setIsNoteStarted] = useState(appointment.status === 'in_progress');
     const [note, setNote] = useState({
         subjective: '',
@@ -22,11 +32,15 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
     });
     const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
     const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
+    const [labResults, setLabResults] = useState<LabResult[]>([]);
+    const [documents, setDocuments] = useState<ConsultationDocument[]>([]);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
     const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
     const [isLabOrderModalOpen, setIsLabOrderModalOpen] = useState(false);
+    const [isLabResultModalOpen, setIsLabResultModalOpen] = useState(false);
+    const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
 
     const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -41,7 +55,33 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
     const handleAddLabOrder = (newLabOrder: LabOrder) => {
         setLabOrders(prev => [...prev, newLabOrder]);
         setIsLabOrderModalOpen(false);
-    }
+    };
+
+    const handleAddLabResult = (newLabResult: LabResult) => {
+        setLabResults(prev => [...prev, newLabResult]);
+        setIsLabResultModalOpen(false);
+    };
+
+    const handleAddDocument = (newDocument: ConsultationDocument) => {
+        setDocuments(prev => [...prev, newDocument]);
+        setIsDocumentModalOpen(false);
+    };
+
+    const handleRemovePrescription = (index: number) => {
+        setPrescriptions(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleRemoveLabOrder = (index: number) => {
+        setLabOrders(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleRemoveLabResult = (index: number) => {
+        setLabResults(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleRemoveDocument = (index: number) => {
+        setDocuments(prev => prev.filter((_, idx) => idx !== index));
+    };
     
     const handleStartConsultation = async () => {
         try {
@@ -57,45 +97,50 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
     };
 
     const handleFinalize = async () => {
-        const pin = prompt("Para firmar la nota, por favor ingrese su PIN de 4 dígitos.");
-        if (pin === "1234") { // Mock PIN check
-            setIsSubmitting(true);
-            try {
-                const summaryPieces = [note.assessment, note.plan].filter(Boolean);
-                const summary = summaryPieces.length > 0 ? summaryPieces.join(' • ') : 'Consulta clínica finalizada';
+        const fallbackAppointmentPatientId = appointment.patientId;
+        const resolvedPatientId = (patientIdProp ?? patient.id ?? appointment.patient?.id ?? fallbackAppointmentPatientId ?? '').trim();
+        if (!resolvedPatientId) {
+            alert('No se pudo identificar al paciente para registrar la nota.');
+            console.error('ClinicalNoteEditor: missing patientId', { patient, appointment });
+            return;
+        }
 
-                const response = await createConsultationNote({
-                    patientId: patient.id,
-                    appointmentId: appointment.id,
-                    status: 'final',
-                    title: `${appointment.type.name} - ${patient.firstName} ${patient.lastName}`.trim(),
-                    summary,
-                    soapNote: {
-                        subjective: note.subjective,
-                        objective: note.objective,
-                        assessment: note.assessment,
-                        plan: note.plan,
-                    },
-                    prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
-                    labOrders: labOrders.length > 0 ? labOrders : undefined,
-                    tags: ['consulta'],
-                    performedAt: new Date().toISOString(),
-                });
+        setIsSubmitting(true);
+        try {
+            const summaryPieces = [note.assessment, note.plan].filter(Boolean);
+            const summary = summaryPieces.length > 0 ? summaryPieces.join(' • ') : 'Consulta clínica finalizada';
 
-                await updateAppointmentStatus(appointment.id, 'attended_pending_payment');
-                alert("Consulta finalizada y nota firmada. Notificando a recepción para el check-out.");
-                if (onEventCreated) {
-                    await onEventCreated(response.eventId);
-                }
-                onFinalize();
-            } catch (error) {
-                alert("Error al finalizar la consulta.");
-                console.error(error);
-            } finally {
-                setIsSubmitting(false);
+            const response = await createConsultationNote({
+                patientId: resolvedPatientId,
+                appointmentId: appointment.id,
+                status: 'final',
+                title: `${appointment.type.name} - ${patient.firstName} ${patient.lastName}`.trim(),
+                summary,
+                soapNote: {
+                    subjective: note.subjective,
+                    objective: note.objective,
+                    assessment: note.assessment,
+                    plan: note.plan,
+                },
+                prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
+                labOrders: labOrders.length > 0 ? labOrders : undefined,
+                labResults: labResults.length > 0 ? labResults : undefined,
+                documents: documents.length > 0 ? documents : undefined,
+                tags: ['consulta'],
+                performedAt: new Date().toISOString(),
+            });
+
+            await updateAppointmentStatus(appointment.id, 'attended_pending_payment');
+            alert('Consulta finalizada y nota firmada. Notificando a recepción para el check-out.');
+            if (onEventCreated) {
+                await onEventCreated(response.eventId);
             }
-        } else if (pin) {
-            alert("PIN incorrecto.");
+            onFinalize();
+        } catch (error) {
+            alert('Error al finalizar la consulta.');
+            console.error(error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
     
@@ -148,20 +193,140 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
                         <div>
                             <div className="flex justify-between items-center">
                                 <h5 className="font-semibold text-gray-600">Recetas</h5>
-                                <button onClick={() => setIsPrescriptionModalOpen(true)} className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded">+ Añadir</button>
+                                <button
+                                    onClick={() => setIsPrescriptionModalOpen(true)}
+                                    className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded"
+                                >
+                                    + Añadir
+                                </button>
                             </div>
-                            <ul className="mt-2 text-sm list-disc list-inside">
-                                {prescriptions.map((p, i) => <li key={i}>{p.medicationName} {p.dosage} - {p.frequency}</li>)}
+                            <ul className="mt-2 text-sm space-y-1">
+                                {prescriptions.length === 0 && <li className="text-gray-500">Sin recetas añadidas</li>}
+                                {prescriptions.map((item, index) => (
+                                    <li
+                                        key={item.id || `pres-${index}`}
+                                        className="flex items-start justify-between bg-white border rounded px-2 py-1"
+                                    >
+                                        <span>
+                                            <span className="font-medium">{item.medicationName}</span>
+                                            {item.dosage ? ` • ${item.dosage}` : ''}
+                                            {item.frequency ? ` • ${item.frequency}` : ''}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemovePrescription(index)}
+                                            className="text-xs text-red-500 hover:text-red-600 ml-3"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                         {/* Lab Orders */}
-                         <div>
+                        <div>
                             <div className="flex justify-between items-center">
                                 <h5 className="font-semibold text-gray-600">Órdenes de Laboratorio</h5>
-                                <button onClick={() => setIsLabOrderModalOpen(true)} className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded">+ Añadir</button>
+                                <button
+                                    onClick={() => setIsLabOrderModalOpen(true)}
+                                    className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded"
+                                >
+                                    + Añadir
+                                </button>
                             </div>
-                             <ul className="mt-2 text-sm list-disc list-inside">
-                                {labOrders.map((l, i) => <li key={i}>{l.testName}</li>)}
+                            <ul className="mt-2 text-sm space-y-1">
+                                {labOrders.length === 0 && <li className="text-gray-500">Sin órdenes registradas</li>}
+                                {labOrders.map((item, index) => (
+                                    <li
+                                        key={item.id || `lab-order-${index}`}
+                                        className="flex items-start justify-between bg-white border rounded px-2 py-1"
+                                    >
+                                        <span>{item.testName}{item.details ? ` • ${item.details}` : ''}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveLabOrder(index)}
+                                            className="text-xs text-red-500 hover:text-red-600 ml-3"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center">
+                                <h5 className="font-semibold text-gray-600">Resultados de Laboratorio</h5>
+                                <button
+                                    onClick={() => setIsLabResultModalOpen(true)}
+                                    className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded"
+                                >
+                                    + Añadir
+                                </button>
+                            </div>
+                            <ul className="mt-2 text-sm space-y-1">
+                                {labResults.length === 0 && <li className="text-gray-500">Sin resultados añadidos</li>}
+                                {labResults.map((item, index) => (
+                                    <li
+                                        key={item.id || `lab-result-${index}`}
+                                        className="flex items-start justify-between bg-white border rounded px-2 py-1"
+                                    >
+                                        <span>
+                                            <span className="font-medium">{item.testName}</span>
+                                            {item.resultValue ? ` • ${item.resultValue}` : ''}
+                                            {item.unit ? ` ${item.unit}` : ''}
+                                            {item.referenceRange ? ` (Ref: ${item.referenceRange})` : ''}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveLabResult(index)}
+                                            className="text-xs text-red-500 hover:text-red-600 ml-3"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center">
+                                <h5 className="font-semibold text-gray-600">Documentos adjuntos</h5>
+                                <button
+                                    onClick={() => setIsDocumentModalOpen(true)}
+                                    className="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold py-1 px-2 rounded"
+                                >
+                                    + Añadir
+                                </button>
+                            </div>
+                            <ul className="mt-2 text-sm space-y-1">
+                                {documents.length === 0 && <li className="text-gray-500">Sin documentos adjuntos</li>}
+                                {documents.map((item, index) => (
+                                    <li
+                                        key={item.id || `document-${index}`}
+                                        className="flex items-start justify-between bg-white border rounded px-2 py-1"
+                                    >
+                                        <span>
+                                            <span className="font-medium">{item.title}</span>
+                                            {item.type ? ` • ${item.type}` : ''}
+                                            {item.url ? (
+                                                <a
+                                                    href={item.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:underline ml-2"
+                                                >
+                                                    Abrir
+                                                </a>
+                                            ) : null}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveDocument(index)}
+                                            className="text-xs text-red-500 hover:text-red-600 ml-3"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     </div>
@@ -196,6 +361,20 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
                     isOpen={isLabOrderModalOpen}
                     onClose={() => setIsLabOrderModalOpen(false)}
                     onAddLabOrder={handleAddLabOrder}
+                />
+            )}
+            {isLabResultModalOpen && (
+                <LabResultModal
+                    isOpen={isLabResultModalOpen}
+                    onClose={() => setIsLabResultModalOpen(false)}
+                    onAddLabResult={handleAddLabResult}
+                />
+            )}
+            {isDocumentModalOpen && (
+                <DocumentModal
+                    isOpen={isDocumentModalOpen}
+                    onClose={() => setIsDocumentModalOpen(false)}
+                    onAddDocument={handleAddDocument}
                 />
             )}
         </div>

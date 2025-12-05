@@ -195,9 +195,7 @@ const LoginPage: React.FC = () => {
     <div className="flex items-center justify-center min-h-screen bg-slate-100">
       <div className="p-8 bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="flex justify-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-teal-500 icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-            </svg>
+            <img src="/imagenes/logo.png" alt="Logo" className="h-12 w-12" />
         </div>
         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Welcome to AyniSalud Integral</h2>
         <p className="text-center text-gray-500 mb-8">Sign in to your account</p>

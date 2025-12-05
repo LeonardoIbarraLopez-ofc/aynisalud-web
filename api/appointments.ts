@@ -2,7 +2,7 @@ import { type Appointment, type AppointmentType, type Patient, type User } from 
 import { callBackendFunction } from './functionsClient';
 
 const normalizePatient = (raw: any): Patient => ({
-    id: String(raw?.id || ''),
+    id: String(raw?.id || raw?.patientId || raw?.uid || ''),
     firstName: String(raw?.firstName || ''),
     lastName: String(raw?.lastName || ''),
     dob: String(raw?.dob || ''),
@@ -45,14 +45,30 @@ const normalizeAppointmentType = (raw: any): AppointmentType => ({
 export const normalizeAppointment = (raw: any): Appointment => {
     const start = raw?.startTime ? new Date(raw.startTime).toISOString() : new Date().toISOString();
     const end = raw?.endTime ? new Date(raw.endTime).toISOString() : start;
+    const patientSnapshot = raw?.patient || raw?.patientSnapshot || {};
+    const doctorSnapshot = raw?.doctor || raw?.doctorSnapshot || {};
+
+    const patientId = String(
+        raw?.patientId ||
+        patientSnapshot?.id ||
+        patientSnapshot?.patientId ||
+        ''
+    );
+    const doctorId = String(raw?.doctorId || doctorSnapshot?.id || '');
+
+    const normalizedPatient = normalizePatient({ patientId, ...patientSnapshot });
+    const normalizedDoctor = normalizeUser({ id: doctorId, ...doctorSnapshot });
+
     return {
         id: String(raw?.id || ''),
-        patient: normalizePatient(raw?.patient || {}),
-        doctor: normalizeUser(raw?.doctor || {}),
+        patient: normalizedPatient,
+        patientId: patientId || undefined,
+        doctor: normalizedDoctor,
+        doctorId: doctorId || undefined,
         startTime: start,
         endTime: end,
         status: raw?.status || 'confirmed',
-        type: normalizeAppointmentType(raw?.type || {}),
+        type: normalizeAppointmentType(raw?.type || raw?.typeSnapshot || {}),
         checkinTime: raw?.checkinTime ? new Date(raw.checkinTime).toISOString() : undefined,
         notes: raw?.notes || undefined,
         associatedInvoiceId: raw?.associatedInvoiceId || undefined,

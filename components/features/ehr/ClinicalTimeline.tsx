@@ -16,6 +16,13 @@ const EventIcon: React.FC<{ type: ClinicalTimelineEvent['type'] }> = ({ type }) 
 
 const TimelineEventCard: React.FC<{ event: ClinicalTimelineEvent }> = ({ event }) => {
     const metadata = (event.metadata || {}) as Record<string, any>;
+    const prescriptions = Array.isArray(metadata.prescriptions) ? metadata.prescriptions : [];
+    const labOrders = Array.isArray(metadata.labOrders) ? metadata.labOrders : [];
+    const labResults = Array.isArray(metadata.labResults) ? metadata.labResults : [];
+    const documents = Array.isArray(metadata.attachments) ? metadata.attachments : [];
+    const vitals = Array.isArray(metadata.vitals) ? metadata.vitals : [];
+    const soapNote = metadata?.soapNote && typeof metadata.soapNote === 'object' ? metadata.soapNote : null;
+
     return (
         <div className="relative pl-8">
             <div className="absolute left-0 top-1.5 transform -translate-x-1/2 w-4 h-4 bg-teal-500 rounded-full border-2 border-white"></div>
@@ -26,30 +33,103 @@ const TimelineEventCard: React.FC<{ event: ClinicalTimelineEvent }> = ({ event }
                 </div>
                 <p className="text-sm text-gray-600">{event.summary}</p>
                 {metadata?.status && <p className="text-xs text-gray-500 mt-1">Estado: {metadata.status}</p>}
-                {Array.isArray(metadata?.prescriptions) && metadata.prescriptions.length > 0 && (
+
+                {soapNote && (
+                    <div className="mt-2 text-xs text-slate-600 space-y-1">
+                        <strong>SOAP:</strong>
+                        <p><span className="font-semibold">S:</span> {soapNote.subjective || '—'}</p>
+                        <p><span className="font-semibold">O:</span> {soapNote.objective || '—'}</p>
+                        <p><span className="font-semibold">A:</span> {soapNote.assessment || '—'}</p>
+                        <p><span className="font-semibold">P:</span> {soapNote.plan || '—'}</p>
+                    </div>
+                )}
+
+                {prescriptions.length > 0 && (
                     <div className="mt-2 text-xs text-slate-600">
                         <strong>Recetas:</strong>
                         <ul className="list-disc list-inside">
-                            {metadata.prescriptions.map((rx: any, index: number) => (
-                                <li key={index}>{rx.medicationName}{rx.dosage ? ` • ${rx.dosage}` : ''}{rx.frequency ? ` • ${rx.frequency}` : ''}</li>
+                            {prescriptions.map((rx: any, index: number) => (
+                                <li key={`rx-${index}`}>
+                                    <span className="font-semibold">{rx.medicationName}</span>
+                                    {rx.dosage && <> • {rx.dosage}</>}
+                                    {rx.frequency && <> • {rx.frequency}</>}
+                                    {rx.duration && <> • {rx.duration}</>}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 )}
-                {Array.isArray(metadata?.labOrders) && metadata.labOrders.length > 0 && (
+
+                {labOrders.length > 0 && (
                     <div className="mt-2 text-xs text-slate-600">
-                        <strong>Órdenes:</strong>
+                        <strong>Órdenes de laboratorio:</strong>
                         <ul className="list-disc list-inside">
-                            {metadata.labOrders.map((order: any, index: number) => (
-                                <li key={index}>{order.testName}</li>
+                            {labOrders.map((order: any, index: number) => (
+                                <li key={`order-${index}`}>
+                                    {order.testName}
+                                    {order.details && <span className="text-slate-500"> — {order.details}</span>}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 )}
+
+                {labResults.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-600">
+                        <strong>Resultados de laboratorio:</strong>
+                        <ul className="list-disc list-inside">
+                            {labResults.map((result: any, index: number) => (
+                                <li key={`result-${index}`}>
+                                    <span className="font-semibold">{result.testName}</span>
+                                    {result.resultValue && <> • {result.resultValue}</>}
+                                    {result.unit && <> {result.unit}</>}
+                                    {result.referenceRange && <span className="text-slate-500"> (Ref: {result.referenceRange})</span>}
+                                    {result.interpretation && <div className="text-slate-500">Interpretación: {result.interpretation}</div>}
+                                    {result.notes && <div className="text-slate-500">Notas: {result.notes}</div>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {vitals.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-600">
+                        <strong>Signos vitales:</strong>
+                        <ul className="list-disc list-inside">
+                            {vitals.map((vital: any, index: number) => (
+                                <li key={`vital-${index}`}>
+                                    <span className="font-semibold">{vital.name}:</span> {vital.value}{vital.unit ? ` ${vital.unit}` : ''}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {documents.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-600">
+                        <strong>Documentos adjuntos:</strong>
+                        <ul className="list-disc list-inside">
+                            {documents.map((doc: any, index: number) => (
+                                <li key={`doc-${index}`}>
+                                    {doc.url ? (
+                                        <a href={doc.url} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                            {doc.title}
+                                        </a>
+                                    ) : (
+                                        doc.title
+                                    )}
+                                    {doc.description && <div className="text-slate-500">{doc.description}</div>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
                 <div className="flex items-center mt-2 text-xs text-gray-500">
                     <EventIcon type={event.type} />
                     <span className="ml-1.5">por {event.actor}</span>
                 </div>
+
                 {event.tags && event.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                         {event.tags.map(tag => (

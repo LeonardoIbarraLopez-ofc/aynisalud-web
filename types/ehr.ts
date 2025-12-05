@@ -78,6 +78,44 @@ export interface VitalSign {
   unit?: string;
 }
 
+export interface LabResult {
+  id: string;
+  testName: string;
+  resultValue?: string;
+  unit?: string;
+  referenceRange?: string;
+  interpretation?: string;
+  notes?: string;
+}
+
+export interface ConsultationDocument {
+  id: string;
+  title: string;
+  url?: string;
+  description?: string;
+  type?: string;
+}
+
+export type ConsultationAttachmentType =
+  | 'general_note'
+  | 'prescription'
+  | 'lab_order'
+  | 'lab_result'
+  | 'document';
+
+export interface ConsultationAttachmentBase<T extends ConsultationAttachmentType, P> {
+  id: string;
+  type: T;
+  payload: P;
+}
+
+export type ConsultationAttachment =
+  | ConsultationAttachmentBase<'general_note', SoapNoteInput>
+  | ConsultationAttachmentBase<'prescription', Prescription>
+  | ConsultationAttachmentBase<'lab_order', LabOrder>
+  | ConsultationAttachmentBase<'lab_result', LabResult>
+  | ConsultationAttachmentBase<'document', ConsultationDocument>;
+
 export type TimelineEventTypeInput =
   | 'consultation_note'
   | 'clinical_note'
@@ -109,6 +147,8 @@ export interface AddEhrEventPayload {
     soapNote?: SoapNoteInput;
     prescriptions?: Array<Partial<Prescription> & { medicationName: string }>;
     labOrders?: Array<Partial<LabOrder> & { testName: string }>;
+    labResults?: Array<Partial<LabResult> & { testName: string }>;
     vitals?: Array<Partial<VitalSign> & { name: string; value: string }>;
+    documents?: Array<Partial<ConsultationDocument> & { title: string }>;
   };
 }
