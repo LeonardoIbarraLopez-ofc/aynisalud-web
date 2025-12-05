@@ -4,6 +4,7 @@ import DoctorDashboard from '../components/features/dashboard/DoctorDashboard';
 import PatientDashboard from '../components/features/dashboard/PatientDashboard';
 import { useAuth } from '../contexts/AuthContext';
 import { Spinner } from '../components/common/Spinner';
+import AdminDashboard from '../components/features/dashboard/AdminDashboard';
 
 const DashboardPage: React.FC = () => {
     const { user } = useAuth();
@@ -22,6 +23,8 @@ const DashboardPage: React.FC = () => {
         case 'doctor':
         case 'specialist':
             return <DoctorDashboard />;
+        case 'admin':
+            return <AdminDashboard />;
         case 'patient':
             return <PatientDashboard />;
         default:

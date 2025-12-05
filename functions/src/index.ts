@@ -16,6 +16,7 @@ const billing = require('./billing');
 const patientPortal = require('./patientPortal');
 const patientScheduling = require('./patientScheduling');
 const ehr = require('./ehr');
+const analytics = require('./analytics');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 export const createUserAdmin = users.createUserAdmin;
@@ -72,3 +73,5 @@ export const getPatientEhr = ehr.getPatientEhr;
 export const getPatientEhrHttp = ehr.getPatientEhrHttp;
 export const addEhrEvent = ehr.addEhrEvent;
 export const addEhrEventHttp = ehr.addEhrEventHttp;
+export const getAppointmentAnalytics = analytics.getAppointmentAnalytics;
+export const getAppointmentAnalyticsHttp = analytics.getAppointmentAnalyticsHttp;

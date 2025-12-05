@@ -98,7 +98,10 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
 
     const handleFinalize = async () => {
         const fallbackAppointmentPatientId = appointment.patientId;
-        const resolvedPatientId = (patientIdProp ?? patient.id ?? appointment.patient?.id ?? fallbackAppointmentPatientId ?? '').trim();
+        const tentativePatientId = (patientIdProp ?? patient.id ?? appointment.patient?.id ?? fallbackAppointmentPatientId ?? '').trim();
+        const normalizedCandidate = tentativePatientId.toLowerCase();
+        const invalidMarkers = new Set(['', 'undefined', 'null', 'nan']);
+        const resolvedPatientId = invalidMarkers.has(normalizedCandidate) ? '' : tentativePatientId;
         if (!resolvedPatientId) {
             alert('No se pudo identificar al paciente para registrar la nota.');
             console.error('ClinicalNoteEditor: missing patientId', { patient, appointment });

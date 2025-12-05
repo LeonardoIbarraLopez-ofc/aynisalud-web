@@ -6,3 +6,4 @@ export * from './ehr';
 export * from './billing';
 export * from './patientPortal';
 export * from './scheduling';
+export * from './analytics';

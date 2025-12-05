@@ -1,27 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getAppointmentById } from '../api/appointments';
 import { type Appointment } from '../types';
 import EHRView from '../components/features/ehr/EHRView';
 import { Spinner } from '../components/common/Spinner';
 
 const ConsultationPage: React.FC = () => {
-  const { appointmentId } = useParams<{ appointmentId: string }>();
+  const { appointmentId: routeParam } = useParams<{ appointmentId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const resolvedAppointmentId = useMemo(() => {
+    if (routeParam && routeParam.trim().length > 0) {
+      return routeParam.trim();
+    }
+
+    const searchParams = new URLSearchParams(location.search);
+    const queryId = searchParams.get('appointmentId');
+    return queryId && queryId.trim().length > 0 ? queryId.trim() : undefined;
+  }, [routeParam, location.search]);
+
   useEffect(() => {
-    if (!appointmentId) {
-      setError('No appointment ID provided.');
+    if (!resolvedAppointmentId) {
+      setError('No se proporcionó el identificador de la cita. Abre la consulta desde la agenda o la cola de pacientes.');
       setIsLoading(false);
       return;
     }
 
     const fetchAppointment = async () => {
       try {
-        const data = await getAppointmentById(appointmentId);
+        const data = await getAppointmentById(resolvedAppointmentId);
         if (data) {
           setAppointment(data);
         } else {
@@ -36,7 +47,7 @@ const ConsultationPage: React.FC = () => {
     };
 
     fetchAppointment();
-  }, [appointmentId]);
+  }, [resolvedAppointmentId]);
 
   const handleConsultationEnd = () => {
     // Navigate back to the dashboard after the consultation is finalized

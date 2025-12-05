@@ -510,51 +510,230 @@ async function ensureCheckoutDemo(doctorRecord, patientRecord) {
   console.log('Seeded demo invoice inv-checkout-demo');
 }
 
+async function createBulkDoctors() {
+  const doctors = [
+    { email: 'doctor@local.test', password: 'doctor123', name: 'Dr. Ejemplo', license: 'CMP 123456', specialties: ['Medicina General'], experience: 8, bio: 'Médico general con enfoque en atención primaria, seguimiento de pacientes crónicos y prevención.' },
+    { email: 'dr.garcia@local.test', password: 'doctor123', name: 'Dra. María García', license: 'CMP 234567', specialties: ['Pediatría'], experience: 10, bio: 'Pediatra especializada en desarrollo infantil y vacunas.' },
+    { email: 'dr.rodriguez@local.test', password: 'doctor123', name: 'Dr. Carlos Rodríguez', license: 'CMP 345678', specialties: ['Medicina Interna'], experience: 15, bio: 'Internista con experiencia en enfermedades crónicas.' },
+    { email: 'dr.lopez@local.test', password: 'doctor123', name: 'Dra. Ana López', license: 'CMP 456789', specialties: ['Ginecología'], experience: 12, bio: 'Ginecóloga con enfoque en salud reproductiva.' },
+    { email: 'dr.martinez@local.test', password: 'doctor123', name: 'Dr. Juan Martínez', license: 'CMP 567890', specialties: ['Dermatología'], experience: 9, bio: 'Dermatólogo especializado en tratamientos estéticos.' },
+    { email: 'dr.sanchez@local.test', password: 'doctor123', name: 'Dra. Laura Sánchez', license: 'CMP 678901', specialties: ['Psiquiatría'], experience: 11, bio: 'Psiquiatra con experiencia en trastornos de ansiedad.' },
+    { email: 'dr.torres@local.test', password: 'doctor123', name: 'Dr. Miguel Torres', license: 'CMP 789012', specialties: ['Oftalmología'], experience: 14, bio: 'Oftalmólogo especializado en cirugía refractiva.' },
+    { email: 'dr.ramirez@local.test', password: 'doctor123', name: 'Dra. Carmen Ramírez', license: 'CMP 890123', specialties: ['Endocrinología'], experience: 13, bio: 'Endocrinóloga enfocada en diabetes y tiroides.' },
+  ];
+
+  const doctorRecords = [];
+  for (const doc of doctors) {
+    const record = await createUserIfMissing(doc.email, doc.password, doc.name, 'doctor', 'clinic-1');
+    await upsertProviderProfile(record.uid, 'doctor', {
+      professionalLicense: doc.license,
+      specialties: doc.specialties,
+      languages: ['Español'],
+      yearsExperience: doc.experience,
+      bio: doc.bio,
+    });
+    await upsertProviderSchedule(record.uid, 'doctor', {
+      slotDurationMinutes: 30,
+    });
+    doctorRecords.push(record);
+  }
+  return doctorRecords;
+}
+
+async function createBulkSpecialists() {
+  const specialists = [
+    { email: 'specialist@local.test', password: 'specialist123', name: 'Especialista Ejemplo', license: 'RNE 987654', specialties: ['Cardiología', 'Electrocardiografía'], experience: 12, bio: 'Cardiólogo con experiencia en diagnóstico no invasivo y programas de rehabilitación cardiovascular.' },
+    { email: 'cardio@local.test', password: 'specialist123', name: 'Dr. Roberto Vargas', license: 'RNE 876543', specialties: ['Cardiología Intervencionista'], experience: 18, bio: 'Cardiólogo intervencionista con experiencia en angioplastia.' },
+    { email: 'neuro@local.test', password: 'specialist123', name: 'Dra. Patricia Morales', license: 'RNE 765432', specialties: ['Neurología'], experience: 16, bio: 'Neuróloga especializada en migrañas y epilepsia.' },
+    { email: 'ortho@local.test', password: 'specialist123', name: 'Dr. Fernando Castro', license: 'RNE 654321', specialties: ['Ortopedia'], experience: 20, bio: 'Ortopedista con especialización en artroscopía.' },
+  ];
+
+  const specialistRecords = [];
+  for (const spec of specialists) {
+    const record = await createUserIfMissing(spec.email, spec.password, spec.name, 'specialist', 'clinic-1');
+    await upsertProviderProfile(record.uid, 'specialist', {
+      professionalLicense: spec.license,
+      specialties: spec.specialties,
+      languages: ['Español', 'Inglés'],
+      yearsExperience: spec.experience,
+      bio: spec.bio,
+    });
+    await upsertProviderSchedule(record.uid, 'specialist', {
+      slotDurationMinutes: 45,
+    });
+    specialistRecords.push(record);
+  }
+  return specialistRecords;
+}
+
+async function createBulkPatients() {
+  const patients = [
+    { email: 'patient@local.test', password: 'patient123', name: 'Paciente Ejemplo' },
+    { email: 'juan.perez@local.test', password: 'patient123', name: 'Juan Pérez' },
+    { email: 'maria.gomez@local.test', password: 'patient123', name: 'María Gómez' },
+    { email: 'carlos.ruiz@local.test', password: 'patient123', name: 'Carlos Ruiz' },
+    { email: 'ana.martinez@local.test', password: 'patient123', name: 'Ana Martínez' },
+    { email: 'luis.sanchez@local.test', password: 'patient123', name: 'Luis Sánchez' },
+    { email: 'carmen.torres@local.test', password: 'patient123', name: 'Carmen Torres' },
+    { email: 'jose.ramirez@local.test', password: 'patient123', name: 'José Ramírez' },
+    { email: 'rosa.fernandez@local.test', password: 'patient123', name: 'Rosa Fernández' },
+    { email: 'manuel.diaz@local.test', password: 'patient123', name: 'Manuel Díaz' },
+    { email: 'isabel.moreno@local.test', password: 'patient123', name: 'Isabel Moreno' },
+    { email: 'francisco.jimenez@local.test', password: 'patient123', name: 'Francisco Jiménez' },
+    { email: 'dolores.ruiz@local.test', password: 'patient123', name: 'Dolores Ruiz' },
+    { email: 'antonio.alvarez@local.test', password: 'patient123', name: 'Antonio Álvarez' },
+    { email: 'pilar.molina@local.test', password: 'patient123', name: 'Pilar Molina' },
+    { email: 'angel.munoz@local.test', password: 'patient123', name: 'Ángel Muñoz' },
+    { email: 'concepcion.ortega@local.test', password: 'patient123', name: 'Concepción Ortega' },
+    { email: 'javier.delgado@local.test', password: 'patient123', name: 'Javier Delgado' },
+    { email: 'beatriz.castro@local.test', password: 'patient123', name: 'Beatriz Castro' },
+    { email: 'raul.rubio@local.test', password: 'patient123', name: 'Raúl Rubio' },
+    { email: 'elena.serrano@local.test', password: 'patient123', name: 'Elena Serrano' },
+    { email: 'pedro.blanco@local.test', password: 'patient123', name: 'Pedro Blanco' },
+    { email: 'silvia.navarro@local.test', password: 'patient123', name: 'Silvia Navarro' },
+    { email: 'alberto.gil@local.test', password: 'patient123', name: 'Alberto Gil' },
+    { email: 'teresa.romero@local.test', password: 'patient123', name: 'Teresa Romero' },
+  ];
+
+  const patientRecords = [];
+  for (const pat of patients) {
+    const record = await createUserIfMissing(pat.email, pat.password, pat.name, 'patient', 'clinic-1');
+    patientRecords.push(record);
+  }
+  return patientRecords;
+}
+
+async function createBulkAppointmentTypes() {
+  const types = [
+    { id: 'consulta-general', name: 'Consulta General', duration: 30, price: 150, description: 'Chequeo de rutina.' },
+    { id: 'consulta-especialista', name: 'Consulta Especialista', duration: 45, price: 250, description: 'Consulta con especialista.' },
+    { id: 'control-cronico', name: 'Control Crónico', duration: 30, price: 120, description: 'Seguimiento de enfermedades crónicas.' },
+    { id: 'emergencia', name: 'Emergencia', duration: 60, price: 300, description: 'Atención de urgencias.' },
+    { id: 'vacunacion', name: 'Vacunación', duration: 15, price: 80, description: 'Aplicación de vacunas.' },
+    { id: 'examen-fisico', name: 'Examen Físico', duration: 45, price: 200, description: 'Examen físico completo.' },
+    { id: 'psicologia', name: 'Consulta Psicológica', duration: 50, price: 180, description: 'Sesión de psicología.' },
+    { id: 'oftalmologia', name: 'Consulta Oftalmológica', duration: 40, price: 220, description: 'Revisión ocular.' },
+  ];
+
+  for (const type of types) {
+    await ensureAppointmentType(type.id, {
+      name: type.name,
+      durationMinutes: type.duration,
+      price: type.price,
+      description: type.description,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+}
+
+async function createBulkAppointments(doctors, specialists, patients) {
+  const db = admin.firestore();
+  const allProviders = [...doctors, ...specialists];
+  const appointmentTypes = ['consulta-general', 'consulta-especialista', 'control-cronico', 'emergencia', 'vacunacion', 'examen-fisico', 'psicologia', 'oftalmologia'];
+  const statuses = ['completed', 'confirmed', 'pending_confirmation', 'cancelled', 'no_show', 'checked_in', 'in_progress', 'attended_pending_payment'];
+
+  const now = new Date();
+  const appointments = [];
+
+  // Create appointments for the last 30 days
+  for (let day = 0; day < 30; day++) {
+    const date = new Date(now.getTime() - day * 24 * 60 * 60 * 1000);
+    const numAppointments = Math.floor(Math.random() * 8) + 8; // 8-16 appointments per day
+
+    for (let i = 0; i < numAppointments; i++) {
+      const provider = allProviders[Math.floor(Math.random() * allProviders.length)];
+      const patient = patients[Math.floor(Math.random() * patients.length)];
+      const typeId = appointmentTypes[Math.floor(Math.random() * appointmentTypes.length)];
+
+      // Random time between 8 AM and 6 PM
+      const hour = Math.floor(Math.random() * 10) + 8; // 8-17
+      const minute = Math.floor(Math.random() * 4) * 15; // 0, 15, 30, 45
+      const startTime = new Date(date);
+      startTime.setHours(hour, minute, 0, 0);
+
+      // Get appointment type duration
+      const typeSnap = await db.doc(`appointmentTypes/${typeId}`).get();
+      const duration = typeSnap.exists ? typeSnap.data().durationMinutes : 30;
+      const endTime = new Date(startTime.getTime() + duration * 60000);
+
+      // Weight status distribution to match mock data
+      const statusWeights = [0.4, 0.2, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05]; // completed, confirmed, etc.
+      let statusIndex = 0;
+      const rand = Math.random();
+      let cumulative = 0;
+      for (let j = 0; j < statusWeights.length; j++) {
+        cumulative += statusWeights[j];
+        if (rand <= cumulative) {
+          statusIndex = j;
+          break;
+        }
+      }
+      const status = statuses[statusIndex];
+
+      appointments.push({
+        patientId: patient.uid,
+        doctorId: provider.uid,
+        typeId,
+        startTime,
+        endTime,
+        status,
+        clinicId: 'clinic-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  // Batch create appointments
+  const batch = db.batch();
+  for (const appt of appointments) {
+    const apptId = randomUUID();
+    const apptRef = db.doc(`appointments/${apptId}`);
+    batch.set(apptRef, {
+      ...appt,
+      startTime: admin.firestore.Timestamp.fromDate(appt.startTime),
+      endTime: admin.firestore.Timestamp.fromDate(appt.endTime),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: { uid: 'system-seed', role: 'admin' },
+    });
+  }
+
+  await batch.commit();
+  console.log(`Created ${appointments.length} appointments`);
+}
+
 async function main() {
-  const doctor = await createUserIfMissing('doctor@local.test', 'doctor123', 'Dr. Ejemplo', 'doctor', 'clinic-1');
+  console.log('Starting bulk seeding...');
+
+  // Create receptionists and admin
   await createUserIfMissing('reception@local.test', 'recep123', 'Recepcion', 'receptionist', 'clinic-1');
-  const patient = await createUserIfMissing('patient@local.test', 'patient123', 'Paciente Ejemplo', 'patient', 'clinic-1');
-  // add the remaining roles
-  const specialist = await createUserIfMissing('specialist@local.test', 'specialist123', 'Especialista Ejemplo', 'specialist', 'clinic-1');
   await createUserIfMissing('leo.ibarralopez@gmail.com', 'admin123', 'Admin Ejemplo', 'admin', null);
-  await upsertProviderProfile(doctor.uid, 'doctor', {
-    professionalLicense: 'CMP 123456',
-    specialties: ['Medicina General'],
-    languages: ['Español'],
-    yearsExperience: 8,
-    bio: 'Médico general con enfoque en atención primaria, seguimiento de pacientes crónicos y prevención.',
-  });
-  await upsertProviderSchedule(doctor.uid, 'doctor', {
-    slotDurationMinutes: 30,
-  });
-  await upsertProviderProfile(specialist.uid, 'specialist', {
-    professionalLicense: 'RNE 987654',
-    specialties: ['Cardiología', 'Electrocardiografía'],
-    languages: ['Español', 'Inglés'],
-    yearsExperience: 12,
-    bio: 'Cardiólogo con experiencia en diagnóstico no invasivo y programas de rehabilitación cardiovascular.',
-  });
-  await upsertProviderSchedule(specialist.uid, 'specialist', {
-    slotDurationMinutes: 45,
-    weeklyAvailabilityOverrides: {
-      monday: [
-        { start: '10:00', end: '13:00' },
-        { start: '15:00', end: '19:00' },
-      ],
-      wednesday: [
-        { start: '10:00', end: '16:00' },
-      ],
-      friday: [
-        { start: '09:00', end: '12:00' },
-        { start: '14:00', end: '17:00' },
-      ],
-      saturday: [
-        { start: '09:00', end: '12:00' },
-      ],
-    },
-  });
-  await ensureCheckoutDemo(doctor, patient);
-  await seedPatientEhrTimeline(patient, doctor);
+
+  // Create bulk data
+  console.log('Creating doctors...');
+  const doctors = await createBulkDoctors();
+
+  console.log('Creating specialists...');
+  const specialists = await createBulkSpecialists();
+
+  console.log('Creating patients...');
+  const patients = await createBulkPatients();
+
+  console.log('Creating appointment types...');
+  await createBulkAppointmentTypes();
+
+  console.log('Creating appointments...');
+  await createBulkAppointments(doctors, specialists, patients);
+
+  // Keep the demo checkout and EHR timeline for the first patient
+  const firstDoctor = doctors[0];
+  const firstPatient = patients[0];
+  await ensureCheckoutDemo(firstDoctor, firstPatient);
+  await seedPatientEhrTimeline(firstPatient, firstDoctor);
+
   console.log('Seeding complete');
 }
 
