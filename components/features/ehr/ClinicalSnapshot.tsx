@@ -11,6 +11,14 @@ const SnapshotItem: React.FC<{ item: ClinicalSnapshotItem }> = ({ item }) => {
             <h4 className={`font-bold ${item.isCritical ? 'text-red-800' : 'text-gray-800'}`}>{item.title}</h4>
             <p className={`text-sm ${item.isCritical ? 'text-red-700' : 'text-gray-600'}`}>{item.details}</p>
             {item.date && <p className="text-xs text-gray-400 mt-1">{item.date}</p>}
+            {item.source && <p className="text-xs text-gray-500 mt-1">Fuente: {item.source}</p>}
+            {item.tags && item.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                    {item.tags.map(tag => (
+                        <span key={tag} className="px-2 py-0.5 text-[10px] bg-teal-100 text-teal-700 rounded-full">#{tag}</span>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

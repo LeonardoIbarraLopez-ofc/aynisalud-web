@@ -1,7 +1,7 @@
 import { type Invoice, type PaymentDetails, type Appointment, type InvoiceItem } from '../types';
 import { callBackendFunction } from './functionsClient';
 
-const normalizeInvoice = (raw: any): Invoice => ({
+export const normalizeInvoice = (raw: any): Invoice => ({
     id: String(raw?.id || ''),
     patientId: String(raw?.patientId || ''),
     appointmentId: raw?.appointmentId ? String(raw.appointmentId) : undefined,

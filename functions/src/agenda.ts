@@ -381,23 +381,33 @@ export const listAgendaAppointmentsHttp = makeHttpHandler(listAgendaAppointments
 
 const getAppointmentsForPatientHandler = async (data: any, context: any) => {
   const { token, uid } = await requireAuth(context, data);
-  const patientId: string = data?.patientId;
-  if (!patientId) {
-    throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
-  }
-
   const role = token?.role as UserRole | undefined;
+
+  let requestedPatientId: string = typeof data?.patientId === 'string' ? String(data.patientId).trim() : '';
+
   if (role === 'patient') {
-    const patientSnap = await db.doc(`patients/${patientId}`).get();
-    if (!patientSnap.exists || patientSnap.data()?.authUid !== uid) {
+    const patientQuery = await db.collection('patients').where('authUid', '==', uid).limit(1).get();
+    if (patientQuery.empty) {
+      throw new functions.https.HttpsError('failed-precondition', 'Debe completar su perfil de paciente antes de continuar.');
+    }
+    const ownPatientId = patientQuery.docs[0].id;
+    if (requestedPatientId && requestedPatientId !== ownPatientId) {
       throw new functions.https.HttpsError('permission-denied', 'No autorizado para ver estas citas.');
     }
+    requestedPatientId = ownPatientId;
   } else {
+    if (!requestedPatientId) {
+      throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
+    }
     ensureAgendaAccess(role);
   }
 
+  if (!requestedPatientId) {
+    throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
+  }
+
   const ctxHydration = createHydrationContext();
-  const querySnap = await db.collection('appointments').where('patientId', '==', patientId).get();
+  const querySnap = await db.collection('appointments').where('patientId', '==', requestedPatientId).get();
 
   const appointments: Appointment[] = [];
   for (const doc of querySnap.docs) {

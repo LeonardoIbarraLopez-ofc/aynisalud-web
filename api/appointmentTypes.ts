@@ -10,6 +10,12 @@ const normalizeAppointmentType = (raw: any): AppointmentType => ({
 });
 
 export const getAppointmentTypes = async (): Promise<AppointmentType[]> => {
-    const data = await callBackendFunction<{ appointmentTypes?: any[] }>('listAppointmentTypes', {});
-    return (data?.appointmentTypes || []).map(normalizeAppointmentType);
+    try {
+        const data = await callBackendFunction<{ appointmentTypes?: any[] }>('listPatientAppointmentTypes', {});
+        return (data?.appointmentTypes || []).map(normalizeAppointmentType);
+    } catch (err) {
+        console.warn('[api/appointmentTypes] patient endpoint unavailable, falling back', err);
+        const data = await callBackendFunction<{ appointmentTypes?: any[] }>('listAppointmentTypes', {});
+        return (data?.appointmentTypes || []).map(normalizeAppointmentType);
+    }
 };

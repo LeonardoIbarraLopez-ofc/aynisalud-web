@@ -12,6 +12,7 @@ const NavLinks: React.FC<{ role: UserRole }> = ({ role }) => {
       <>
         <NavLink to="/" className={navLinkClass}>Mi Portal</NavLink>
         <NavLink to="/mis-citas" className={navLinkClass}>Mis Citas</NavLink>
+        <NavLink to="/solicitar-cita" className={navLinkClass}>Solicitar Cita</NavLink>
         <NavLink to="/historial" className={navLinkClass}>Mi Historial</NavLink>
         <NavLink to="/facturacion" className={navLinkClass}>Facturación</NavLink>
       </>

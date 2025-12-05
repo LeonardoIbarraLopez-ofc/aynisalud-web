@@ -33,11 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.addEhrEvent = exports.getPatientEhr = exports.updateInvoiceHttp = exports.getInvoiceByIdHttp = exports.listPaidInvoicesForTodayHttp = exports.updateInvoice = exports.getInvoiceById = exports.listPaidInvoicesForToday = exports.listAppointmentTypesHttp = exports.listDoctorsHttp = exports.createQuickPatientHttp = exports.searchPatientsHttp = exports.updateAppointmentStatusHttp = exports.createAppointmentHttp = exports.getAppointmentByIdHttp = exports.getAppointmentsForPatientHttp = exports.listAgendaAppointmentsHttp = exports.listAppointmentTypes = exports.listDoctors = exports.createQuickPatient = exports.searchPatients = exports.updateAppointmentStatus = exports.createAppointment = exports.getAppointmentById = exports.getAppointmentsForPatient = exports.listAgendaAppointments = exports.verifyPasswordResetHttp = exports.requestPasswordResetHttp = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
-const functions = __importStar(require("firebase-functions"));
+exports.saveProviderScheduleHttp = exports.saveProviderSchedule = exports.getProviderScheduleHttp = exports.getProviderSchedule = exports.listPatientDoctorsHttp = exports.listPatientDoctors = exports.listPatientAppointmentTypesHttp = exports.listPatientAppointmentTypes = exports.requestAppointmentHttp = exports.requestAppointment = exports.getPatientAvailabilityHttp = exports.getPatientAvailability = exports.getPatientPortalOverviewHttp = exports.getPatientPortalOverview = exports.updateInvoiceHttp = exports.getInvoiceByIdHttp = exports.listPaidInvoicesForTodayHttp = exports.updateInvoice = exports.getInvoiceById = exports.listPaidInvoicesForToday = exports.listAppointmentTypesHttp = exports.listDoctorsHttp = exports.createQuickPatientHttp = exports.searchPatientsHttp = exports.updateAppointmentStatusHttp = exports.createAppointmentHttp = exports.getAppointmentByIdHttp = exports.getAppointmentsForPatientHttp = exports.listAgendaAppointmentsHttp = exports.listAppointmentTypes = exports.listDoctors = exports.createQuickPatient = exports.searchPatients = exports.updateAppointmentStatus = exports.createAppointment = exports.getAppointmentById = exports.getAppointmentsForPatient = exports.listAgendaAppointments = exports.verifyPasswordResetHttp = exports.requestPasswordResetHttp = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.addEhrEventHttp = exports.addEhrEvent = exports.getPatientEhrHttp = exports.getPatientEhr = void 0;
 const admin = __importStar(require("firebase-admin"));
-const uuid_1 = require("uuid");
-const utils_1 = require("./utils");
 // Initialize the Admin SDK before loading modules that may call admin APIs
 // during top-level initialization. We use a runtime require for `users` so
 // that admin.initializeApp() runs first and prevents "default app does not exist" errors.
@@ -51,6 +49,9 @@ const admin2fa = require('./admin2fa');
 const passwordReset = require('./passwordReset');
 const agenda = require('./agenda');
 const billing = require('./billing');
+const patientPortal = require('./patientPortal');
+const patientScheduling = require('./patientScheduling');
+const ehr = require('./ehr');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 exports.createUserAdmin = users.createUserAdmin;
@@ -89,83 +90,21 @@ exports.updateInvoice = billing.updateInvoice;
 exports.listPaidInvoicesForTodayHttp = billing.listPaidInvoicesForTodayHttp;
 exports.getInvoiceByIdHttp = billing.getInvoiceByIdHttp;
 exports.updateInvoiceHttp = billing.updateInvoiceHttp;
-// Callable: getPatientEhr
-exports.getPatientEhr = functions.https.onCall(async (data, context) => {
-    const { uid, token } = await (0, utils_1.requireAuth)(context, data);
-    const { patientId } = data || {};
-    let { limit = 100, since } = data || {};
-    limit = Math.min(Number(limit) || 100, 500);
-    if (!patientId)
-        throw new functions.https.HttpsError('invalid-argument', 'patientId required');
-    // Authorization policy (server-side): patient himself OR clinician assigned OR admin
-    const patientDoc = await utils_1.db.doc(`patients/${patientId}`).get();
-    if (!patientDoc.exists)
-        throw new functions.https.HttpsError('not-found', 'patient not found');
-    const patient = patientDoc.data();
-    const callerUid = uid;
-    const allowed = (patient.authUid && patient.authUid === callerUid)
-        || (Array.isArray(patient.authorizedClinicians) && patient.authorizedClinicians.includes(callerUid))
-        || (0, utils_1.isAdmin)(token);
-    if (!allowed) {
-        throw new functions.https.HttpsError('permission-denied', 'Not authorized to read EHR for this patient');
-    }
-    // Audit
-    await (0, utils_1.auditLog)(callerUid, 'read_ehr', 'patients', patientId, { limit, since });
-    // Query timeline subcollection (secure server-side)
-    let q = utils_1.db.collection(`patients/${patientId}/timeline`).orderBy('date', 'desc').limit(limit);
-    if (since)
-        q = q.where('date', '>=', new Date(since));
-    const snap = await q.get();
-    const events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return { patientId, events };
-});
-// Callable: addEhrEvent
-exports.addEhrEvent = functions.https.onCall(async (data, context) => {
-    const { uid, token } = await (0, utils_1.requireAuth)(context, data);
-    const { patientId, event } = data || {};
-    if (!patientId || !event || !event.type)
-        throw new functions.https.HttpsError('invalid-argument', 'patientId and event.type required');
-    const callerUid = uid;
-    const patientSnap = await utils_1.db.doc(`patients/${patientId}`).get();
-    if (!patientSnap.exists)
-        throw new functions.https.HttpsError('not-found', 'patient not found');
-    const patient = patientSnap.data();
-    // Only clinicians or admin or the patient (for personal notes) can add events
-    const allowedToWrite = (0, utils_1.isClinician)(token) || (0, utils_1.isAdmin)(token) || (patient.authUid && patient.authUid === callerUid);
-    if (!allowedToWrite)
-        throw new functions.https.HttpsError('permission-denied', 'Not authorized to add EHR event');
-    // Create a new event id
-    const eventId = (0, uuid_1.v4)();
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    const eventDate = event.date ? new Date(event.date) : admin.firestore.FieldValue.serverTimestamp();
-    const eventDoc = {
-        ...event,
-        actor: { uid: callerUid, role: token?.role || null },
-        createdAt: now,
-        updatedAt: now,
-        date: eventDate,
-    };
-    // Write to patient timeline and create searchable shadow
-    const timelineRef = utils_1.db.doc(`patients/${patientId}/timeline/${eventId}`);
-    const searchableRef = utils_1.db.collection('ehrEvents_searchable').doc(eventId);
-    // Use a batch for atomic-ish write (both will either be written or not) -- Firestore batch is atomic per 500 writes
-    const batch = utils_1.db.batch();
-    batch.set(timelineRef, eventDoc);
-    // Prepare searchable shadow
-    const searchableDoc = {
-        eventId,
-        patientId,
-        clinicId: patient.clinicId || null,
-        // if eventDate is a Date use it, otherwise use serverTimestamp
-        date: eventDate instanceof Date ? eventDate : admin.firestore.FieldValue.serverTimestamp(),
-        type: event.type,
-        code: event.code || null,
-        actorDoctorId: event.actorDoctorId || null,
-        createdAt: now,
-    };
-    batch.set(searchableRef, searchableDoc);
-    await batch.commit();
-    // Audit
-    await (0, utils_1.auditLog)(callerUid, 'create_ehr_event', 'patients', patientId, { eventId, type: event.type });
-    return { success: true, eventId };
-});
+exports.getPatientPortalOverview = patientPortal.getPatientPortalOverview;
+exports.getPatientPortalOverviewHttp = patientPortal.getPatientPortalOverviewHttp;
+exports.getPatientAvailability = patientScheduling.getPatientAvailability;
+exports.getPatientAvailabilityHttp = patientScheduling.getPatientAvailabilityHttp;
+exports.requestAppointment = patientScheduling.requestAppointment;
+exports.requestAppointmentHttp = patientScheduling.requestAppointmentHttp;
+exports.listPatientAppointmentTypes = patientScheduling.listPatientAppointmentTypes;
+exports.listPatientAppointmentTypesHttp = patientScheduling.listPatientAppointmentTypesHttp;
+exports.listPatientDoctors = patientScheduling.listPatientDoctors;
+exports.listPatientDoctorsHttp = patientScheduling.listPatientDoctorsHttp;
+exports.getProviderSchedule = patientScheduling.getProviderSchedule;
+exports.getProviderScheduleHttp = patientScheduling.getProviderScheduleHttp;
+exports.saveProviderSchedule = patientScheduling.saveProviderSchedule;
+exports.saveProviderScheduleHttp = patientScheduling.saveProviderScheduleHttp;
+exports.getPatientEhr = ehr.getPatientEhr;
+exports.getPatientEhrHttp = ehr.getPatientEhrHttp;
+exports.addEhrEvent = ehr.addEhrEvent;
+exports.addEhrEventHttp = ehr.addEhrEventHttp;

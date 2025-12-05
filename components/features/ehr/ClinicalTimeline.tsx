@@ -8,26 +8,59 @@ const EventIcon: React.FC<{ type: ClinicalTimelineEvent['type'] }> = ({ type }) 
     Prescription: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M12 6V4m0 16v-2M5 12h2a7 7 0 0010 0h2" /></svg>,
     ImageStudy: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
     Procedure: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+    Vital: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
+    Document: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
     };
     return icons[type] || null;
 }
 
-const TimelineEventCard: React.FC<{ event: ClinicalTimelineEvent }> = ({ event }) => (
-    <div className="relative pl-8">
-        <div className="absolute left-0 top-1.5 transform -translate-x-1/2 w-4 h-4 bg-teal-500 rounded-full border-2 border-white"></div>
-        <div className="p-3 bg-slate-50 rounded-lg ml-2">
-            <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-gray-800">{event.title}</span>
-                <span className="text-xs text-gray-500">{new Date(event.date).toLocaleDateString()}</span>
-            </div>
-            <p className="text-sm text-gray-600">{event.summary}</p>
-            <div className="flex items-center mt-2 text-xs text-gray-500">
-                <EventIcon type={event.type} />
-                <span className="ml-1.5">por {event.actor}</span>
+const TimelineEventCard: React.FC<{ event: ClinicalTimelineEvent }> = ({ event }) => {
+    const metadata = (event.metadata || {}) as Record<string, any>;
+    return (
+        <div className="relative pl-8">
+            <div className="absolute left-0 top-1.5 transform -translate-x-1/2 w-4 h-4 bg-teal-500 rounded-full border-2 border-white"></div>
+            <div className="p-3 bg-slate-50 rounded-lg ml-2">
+                <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-semibold text-gray-800">{event.title}</span>
+                    <span className="text-xs text-gray-500">{new Date(event.date).toLocaleString()}</span>
+                </div>
+                <p className="text-sm text-gray-600">{event.summary}</p>
+                {metadata?.status && <p className="text-xs text-gray-500 mt-1">Estado: {metadata.status}</p>}
+                {Array.isArray(metadata?.prescriptions) && metadata.prescriptions.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-600">
+                        <strong>Recetas:</strong>
+                        <ul className="list-disc list-inside">
+                            {metadata.prescriptions.map((rx: any, index: number) => (
+                                <li key={index}>{rx.medicationName}{rx.dosage ? ` • ${rx.dosage}` : ''}{rx.frequency ? ` • ${rx.frequency}` : ''}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                {Array.isArray(metadata?.labOrders) && metadata.labOrders.length > 0 && (
+                    <div className="mt-2 text-xs text-slate-600">
+                        <strong>Órdenes:</strong>
+                        <ul className="list-disc list-inside">
+                            {metadata.labOrders.map((order: any, index: number) => (
+                                <li key={index}>{order.testName}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                <div className="flex items-center mt-2 text-xs text-gray-500">
+                    <EventIcon type={event.type} />
+                    <span className="ml-1.5">por {event.actor}</span>
+                </div>
+                {event.tags && event.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                        {event.tags.map(tag => (
+                            <span key={tag} className="px-2 py-0.5 text-[10px] bg-teal-100 text-teal-700 rounded-full">#{tag}</span>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const ClinicalTimeline: React.FC<{ timeline: ClinicalTimelineEvent[], patientName: string }> = ({ timeline, patientName }) => {
     const [filter, setFilter] = useState<ClinicalTimelineEvent['type'] | 'All'>('All');
@@ -42,6 +75,8 @@ const ClinicalTimeline: React.FC<{ timeline: ClinicalTimelineEvent[], patientNam
         { value: 'ConsultationNote', label: 'Notas' },
         { value: 'LabResult', label: 'Laboratorios' },
         { value: 'Prescription', label: 'Recetas' },
+        { value: 'Vital', label: 'Signos Vitales' },
+        { value: 'Document', label: 'Documentos' },
     ];
 
     return (

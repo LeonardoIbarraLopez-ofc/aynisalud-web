@@ -27,6 +27,11 @@ const normalizeUser = (raw: any): User => ({
     avatarUrl: raw?.avatarUrl || undefined,
     phone: raw?.phone || undefined,
     isActive: raw?.isActive !== undefined ? !!raw.isActive : true,
+    professionalLicense: raw?.professionalLicense ? String(raw.professionalLicense) : undefined,
+    specialties: Array.isArray(raw?.specialties) ? raw.specialties.map((item: any) => String(item)) : [],
+    languages: Array.isArray(raw?.languages) ? raw.languages.map((item: any) => String(item)) : [],
+    yearsExperience: Number.isFinite(raw?.yearsExperience) ? Number(raw.yearsExperience) : undefined,
+    bio: raw?.bio ? String(raw.bio) : undefined,
 });
 
 const normalizeAppointmentType = (raw: any): AppointmentType => ({
@@ -37,7 +42,7 @@ const normalizeAppointmentType = (raw: any): AppointmentType => ({
     description: String(raw?.description || ''),
 });
 
-const normalizeAppointment = (raw: any): Appointment => {
+export const normalizeAppointment = (raw: any): Appointment => {
     const start = raw?.startTime ? new Date(raw.startTime).toISOString() : new Date().toISOString();
     const end = raw?.endTime ? new Date(raw.endTime).toISOString() : start;
     return {

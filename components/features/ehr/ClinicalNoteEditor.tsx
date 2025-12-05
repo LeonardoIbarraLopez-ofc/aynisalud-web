@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { type Appointment, type Patient, type Prescription, type LabOrder } from '../../../types';
 import { updateAppointmentStatus } from '../../../api/appointments';
+import { createConsultationNote } from '../../../api/ehr';
 import PrescriptionModal from './PrescriptionModal';
 import LabOrderModal from './LabOrderModal';
 
@@ -9,10 +9,10 @@ interface ClinicalNoteEditorProps {
     appointment: Appointment;
     patient: Patient;
     onFinalize: () => void;
+    onEventCreated?: (eventId: string) => Promise<void> | void;
 }
 
-const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, patient, onFinalize }) => {
-    const navigate = useNavigate();
+const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, patient, onFinalize, onEventCreated }) => {
     const [isNoteStarted, setIsNoteStarted] = useState(appointment.status === 'in_progress');
     const [note, setNote] = useState({
         subjective: '',
@@ -24,6 +24,7 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
     const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
     const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
     const [isLabOrderModalOpen, setIsLabOrderModalOpen] = useState(false);
 
@@ -42,9 +43,17 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
         setIsLabOrderModalOpen(false);
     }
     
-    const handleStartConsultation = () => {
-        // In a real app, this might also update the status via API
-        setIsNoteStarted(true);
+    const handleStartConsultation = async () => {
+        try {
+            setIsStarting(true);
+            await updateAppointmentStatus(appointment.id, 'in_progress');
+            setIsNoteStarted(true);
+        } catch (error) {
+            console.error('No se pudo iniciar la consulta', error);
+            alert('No se pudo iniciar la consulta. Intenta nuevamente.');
+        } finally {
+            setIsStarting(false);
+        }
     };
 
     const handleFinalize = async () => {
@@ -52,10 +61,32 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
         if (pin === "1234") { // Mock PIN check
             setIsSubmitting(true);
             try {
-                // Here you would save the note, prescriptions, and lab orders to the backend.
-                console.log("Finalizing consultation:", { note, prescriptions, labOrders });
+                const summaryPieces = [note.assessment, note.plan].filter(Boolean);
+                const summary = summaryPieces.length > 0 ? summaryPieces.join(' • ') : 'Consulta clínica finalizada';
+
+                const response = await createConsultationNote({
+                    patientId: patient.id,
+                    appointmentId: appointment.id,
+                    status: 'final',
+                    title: `${appointment.type.name} - ${patient.firstName} ${patient.lastName}`.trim(),
+                    summary,
+                    soapNote: {
+                        subjective: note.subjective,
+                        objective: note.objective,
+                        assessment: note.assessment,
+                        plan: note.plan,
+                    },
+                    prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
+                    labOrders: labOrders.length > 0 ? labOrders : undefined,
+                    tags: ['consulta'],
+                    performedAt: new Date().toISOString(),
+                });
+
                 await updateAppointmentStatus(appointment.id, 'attended_pending_payment');
                 alert("Consulta finalizada y nota firmada. Notificando a recepción para el check-out.");
+                if (onEventCreated) {
+                    await onEventCreated(response.eventId);
+                }
                 onFinalize();
             } catch (error) {
                 alert("Error al finalizar la consulta.");
@@ -73,12 +104,13 @@ const ClinicalNoteEditor: React.FC<ClinicalNoteEditorProps> = ({ appointment, pa
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
                  <h3 className="text-xl font-bold text-gray-800 mb-2">Consulta para {patient.firstName} {patient.lastName}</h3>
                  <p className="text-gray-600 mb-4">Motivo: {appointment.notes || appointment.type.name}</p>
-                 <button 
-                    onClick={handleStartConsultation}
-                    className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105"
-                 >
-                    + Iniciar Nota de Consulta
-                 </button>
+                          <button 
+                          onClick={handleStartConsultation}
+                          disabled={isStarting}
+                          className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:hover:scale-100"
+                      >
+                          {isStarting ? 'Iniciando...' : '+ Iniciar Nota de Consulta'}
+                      </button>
             </div>
         )
     }

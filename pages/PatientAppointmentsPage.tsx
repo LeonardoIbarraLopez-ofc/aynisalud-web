@@ -1,14 +1,20 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
 import PatientCalendar from '../components/features/patient/PatientCalendar';
 
 const PatientAppointmentsPage: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div>
       <PageHeader title="Mis Citas Médicas">
         <div className="flex items-center space-x-2">
-            <button className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
-                Solicitar Nueva Cita
+            <button
+              className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105"
+              onClick={() => navigate('/solicitar-cita')}
+            >
+              Solicitar Nueva Cita
             </button>
         </div>
       </PageHeader>

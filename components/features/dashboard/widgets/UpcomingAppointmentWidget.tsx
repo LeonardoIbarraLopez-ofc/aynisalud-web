@@ -1,33 +1,16 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { fetchAppointmentsForPatient } from '../../../../api/appointments';
+import React, { useMemo } from 'react';
 import { type Appointment } from '../../../../types';
 import { Spinner } from '../../../common/Spinner';
 import Card from '../../../common/Card';
 
 interface UpcomingAppointmentWidgetProps {
-    patientId: string;
+    appointments: Appointment[];
+    isLoading: boolean;
+    error?: string | null;
+    onScheduleClick?: () => void;
 }
 
-const UpcomingAppointmentWidget: React.FC<UpcomingAppointmentWidgetProps> = ({ patientId }) => {
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchAppointments = useCallback(async () => {
-        try {
-            const data = await fetchAppointmentsForPatient(patientId);
-            setAppointments(data);
-        } catch (err) {
-            setError('No se pudieron cargar sus citas.');
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [patientId]);
-
-    useEffect(() => {
-        fetchAppointments();
-    }, [fetchAppointments]);
+const UpcomingAppointmentWidget: React.FC<UpcomingAppointmentWidgetProps> = ({ appointments, isLoading, error, onScheduleClick }) => {
 
     const upcomingAppointment = useMemo(() => {
         const now = new Date();

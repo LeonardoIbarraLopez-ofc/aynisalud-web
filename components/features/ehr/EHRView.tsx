@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { fetchEHRByPatientId } from '../../../api/ehr';
 import { type Appointment, type EHR, type Patient } from '../../../types';
 import { Spinner } from '../../common/Spinner';
@@ -17,26 +17,28 @@ const EHRView: React.FC<EHRViewProps> = ({ appointment, onConsultationEnd }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadEHR = async () => {
-      setIsLoading(true);
-      try {
-        const { ehr, patient } = await fetchEHRByPatientId(appointment.patient.id);
-        if (ehr && patient) {
-          setEhrData(ehr);
-          setPatientData(patient);
-        } else {
-          setError('Could not find EHR data for this patient.');
-        }
-      } catch (err) {
-        setError('An error occurred while loading patient records.');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadEHR();
+  const loadEHR = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { ehr, patient } = await fetchEHRByPatientId(appointment.patient.id);
+      setEhrData(ehr);
+      setPatientData(patient);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError('Ocurrió un error al cargar el historial clínico.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [appointment.patient.id]);
+
+  useEffect(() => {
+    loadEHR();
+  }, [loadEHR]);
+
+  const handleEventCreated = useCallback(async () => {
+    await loadEHR();
+  }, [loadEHR]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -58,7 +60,8 @@ const EHRView: React.FC<EHRViewProps> = ({ appointment, onConsultationEnd }) => 
         <ClinicalNoteEditor 
             appointment={appointment} 
             patient={patientData}
-            onFinalize={onConsultationEnd} 
+          onFinalize={onConsultationEnd}
+          onEventCreated={handleEventCreated} 
         />
       </div>
 

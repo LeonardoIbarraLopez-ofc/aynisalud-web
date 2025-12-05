@@ -4,3 +4,5 @@ export * from './patient';
 export * from './appointment';
 export * from './ehr';
 export * from './billing';
+export * from './patientPortal';
+export * from './scheduling';

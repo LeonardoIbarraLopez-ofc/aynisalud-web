@@ -15,6 +15,7 @@ process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'local-aynialud';
 
 const admin = require('firebase-admin');
 admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+const { randomUUID } = require('node:crypto');
 
 function buildSearchKeywords(values) {
   const tokens = new Set();
@@ -112,6 +113,7 @@ async function createUserIfMissing(email, password, name, role, clinicId = null)
           role,
           isActive: true,
           clinicId,
+          ...(role === 'patient' ? { patientProfileId: u.uid } : {}),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -124,12 +126,25 @@ async function createUserIfMissing(email, password, name, role, clinicId = null)
           console.warn('Could not write audit log for', email, e && e.message ? e.message : e);
         }
       }
+      if (snap.exists) {
+        const updates = { updatedAt: new Date(), clinicId, role };
+        if (role === 'patient' && snap.data()?.patientProfileId !== u.uid) {
+          updates.patientProfileId = u.uid;
+        }
+        await docRef.set(updates, { merge: true });
+      }
     } catch (e) {
       console.warn('Could not ensure users doc for', email, e && e.message ? e.message : e);
     }
 
     if (role === 'patient') {
       await ensurePatientProfile(u, name, clinicId);
+      try {
+        const db = admin.firestore();
+        await db.doc(`users/${u.uid}`).set({ patientProfileId: u.uid, updatedAt: new Date() }, { merge: true });
+      } catch (err) {
+        console.warn('Failed to link patientProfileId on user doc for', email, err && err.message ? err.message : err);
+      }
     }
     return u;
   } catch (e) {
@@ -142,6 +157,7 @@ async function createUserIfMissing(email, password, name, role, clinicId = null)
       role,
       isActive: true,
       clinicId,
+      ...(role === 'patient' ? { patientProfileId: u.uid } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -158,6 +174,130 @@ async function createUserIfMissing(email, password, name, role, clinicId = null)
     }
     return u;
   }
+}
+
+async function seedPatientEhrTimeline(patientRecord, doctorRecord) {
+  const db = admin.firestore();
+  const patientId = patientRecord.uid;
+  const doctorId = doctorRecord.uid;
+
+  const timelineCollection = db.collection(`patients/${patientId}/timeline`);
+  const existing = await timelineCollection.limit(1).get();
+  if (!existing.empty) {
+    console.log('Timeline already present for patient', patientId);
+    return;
+  }
+
+  const doctorSnap = await db.doc(`users/${doctorId}`).get();
+  const patientSnap = await db.doc(`patients/${patientId}`).get();
+  const doctorName = doctorSnap.exists ? (doctorSnap.data().name || 'Profesional de salud') : 'Profesional de salud';
+  const clinicId = patientSnap.exists ? patientSnap.data().clinicId || null : null;
+
+  const fieldValue = admin.firestore.FieldValue;
+  const serverTimestamp = typeof fieldValue?.serverTimestamp === 'function' ? fieldValue.serverTimestamp() : new Date();
+
+  const now = new Date();
+  const events = [
+    {
+      type: 'consultation_note',
+      title: 'Consulta de control crónico',
+      summary: 'Revisión de hipertensión y ajuste de tratamiento.',
+      performedAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      tags: ['control', 'hipertension'],
+      soapNote: {
+        subjective: 'Paciente refiere cefalea ocasional por la noche.',
+        objective: 'TA 138/86 mmHg, FC 78 lpm. Sin edemas periféricos.',
+        assessment: 'Hipertensión arterial en seguimiento, control aceptable.',
+        plan: 'Ajustar dosis de losartán a 50mg diarios. Control en 4 semanas.',
+      },
+      prescriptions: [
+        { medicationName: 'Losartán', dosage: '50mg', frequency: '1 tableta diaria', duration: '30 días' },
+      ],
+      labOrders: [
+        { testName: 'Perfil lipídico', details: 'Ayuno de 12 horas.' },
+      ],
+    },
+    {
+      type: 'lab_result',
+      title: 'Perfil lipídico',
+      summary: 'LDL 110 mg/dL, HDL 48 mg/dL, Triglicéridos 150 mg/dL.',
+      performedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+      tags: ['laboratorio'],
+      details: 'Resultados dentro de rango controlado. Recomendar mantener dieta baja en sodio.',
+    },
+    {
+      type: 'prescription',
+      title: 'Renovación de medicación antihipertensiva',
+      summary: 'Se renueva tratamiento antihipertensivo.',
+      performedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+      prescriptions: [
+        { medicationName: 'Losartán', dosage: '50mg', frequency: '1 tableta diaria', duration: '90 días' },
+        { medicationName: 'Hidroclorotiazida', dosage: '25mg', frequency: '1 tableta cada mañana', duration: '60 días' },
+      ],
+      tags: ['medicación'],
+    },
+    {
+      type: 'vital_sign',
+      title: 'Control de signos vitales',
+      summary: 'Signos vitales estables durante visita de seguimiento.',
+      performedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      vitals: [
+        { name: 'Presión arterial', value: '125/82', unit: 'mmHg' },
+        { name: 'Frecuencia cardíaca', value: '76', unit: 'lpm' },
+        { name: 'Peso', value: '78', unit: 'kg' },
+      ],
+      tags: ['signos'],
+    },
+  ];
+
+  const batch = db.batch();
+
+  for (const event of events) {
+    const eventId = randomUUID();
+    const timelineRef = timelineCollection.doc(eventId);
+    const performedAt = admin.firestore.Timestamp.fromDate(event.performedAt);
+    const payload = {
+      type: event.type,
+      title: event.title,
+      summary: event.summary,
+      details: event.details || null,
+      tags: event.tags || [],
+      appointmentId: null,
+      status: 'final',
+      performedAt,
+      soapNote: event.soapNote || null,
+      prescriptions: event.prescriptions || [],
+      labOrders: event.labOrders || [],
+      vitals: event.vitals || [],
+      actor: {
+        uid: doctorId,
+        name: doctorName,
+        role: 'doctor',
+      },
+      createdAt: serverTimestamp,
+      updatedAt: serverTimestamp,
+    };
+
+    batch.set(timelineRef, payload);
+
+    const searchableRef = db.collection('ehrEvents_searchable').doc(eventId);
+    batch.set(searchableRef, {
+      eventId,
+      patientId,
+      clinicId,
+      date: performedAt,
+      type: event.type,
+      code: null,
+      actorDoctorId: doctorId,
+      createdAt: serverTimestamp,
+      title: event.title,
+      summary: event.summary,
+      tags: event.tags || [],
+    });
+  }
+
+  await batch.commit();
+  console.log('Seeded EHR timeline events for patient', patientId);
 }
 
 async function ensureAppointmentType(id, data) {
@@ -202,6 +342,82 @@ function buildDoctorSnapshot(doctorDoc, doctorId) {
     isActive: doctorDoc.isActive !== false,
     clinicId: doctorDoc.clinicId || null,
   };
+}
+
+async function upsertProviderProfile(userId, role, profileData) {
+  const db = admin.firestore();
+  const collection = role === 'specialist' ? 'specialistProfiles' : 'doctorProfiles';
+  const docRef = db.doc(`${collection}/${userId}`);
+  const snapshot = await docRef.get();
+  const payload = {
+    id: userId,
+    professionalLicense: profileData.professionalLicense || '',
+    specialties: Array.isArray(profileData.specialties) ? profileData.specialties : [],
+    languages: Array.isArray(profileData.languages) ? profileData.languages : [],
+    yearsExperience: profileData.yearsExperience || 0,
+    bio: profileData.bio || '',
+    updatedAt: new Date(),
+    updatedBy: 'system-seed',
+  };
+  if (snapshot.exists) {
+    await docRef.set(payload, { merge: true });
+    console.log(`Updated ${collection}/ doc for`, userId);
+  } else {
+    await docRef.set(payload);
+    console.log(`Created ${collection}/ doc for`, userId);
+  }
+}
+
+function buildWeeklyAvailabilityTemplate(templateOverrides = {}) {
+  const base = {
+    sunday: [],
+    monday: [
+      { start: '08:00', end: '12:00' },
+      { start: '14:00', end: '18:00' },
+    ],
+    tuesday: [
+      { start: '08:00', end: '12:00' },
+      { start: '14:00', end: '18:00' },
+    ],
+    wednesday: [
+      { start: '08:00', end: '12:00' },
+      { start: '14:00', end: '18:00' },
+    ],
+    thursday: [
+      { start: '08:00', end: '12:00' },
+      { start: '14:00', end: '18:00' },
+    ],
+    friday: [
+      { start: '08:00', end: '12:00' },
+      { start: '14:00', end: '17:00' },
+    ],
+    saturday: [
+      { start: '09:00', end: '13:00' },
+    ],
+  };
+  return { ...base, ...templateOverrides };
+}
+
+async function upsertProviderSchedule(userId, role, options = {}) {
+  const db = admin.firestore();
+  const docRef = db.doc(`providerSchedules/${userId}`);
+  const timestampField = admin.firestore.FieldValue && admin.firestore.FieldValue.serverTimestamp
+    ? admin.firestore.FieldValue.serverTimestamp()
+    : new Date();
+
+  const schedulePayload = {
+    providerId: userId,
+    timezone: options.timezone || 'America/Lima',
+    slotDurationMinutes: options.slotDurationMinutes || 30,
+    weeklyAvailability: buildWeeklyAvailabilityTemplate(options.weeklyAvailabilityOverrides),
+    overrides: options.overrides || {},
+    blockedDates: options.blockedDates || [],
+    updatedAt: timestampField,
+    updatedBy: { uid: 'system-seed', role: 'admin', source: role },
+  };
+
+  await docRef.set(schedulePayload, { merge: true });
+  console.log('Provisioned schedule for', userId);
 }
 
 async function ensureCheckoutDemo(doctorRecord, patientRecord) {
@@ -299,9 +515,46 @@ async function main() {
   await createUserIfMissing('reception@local.test', 'recep123', 'Recepcion', 'receptionist', 'clinic-1');
   const patient = await createUserIfMissing('patient@local.test', 'patient123', 'Paciente Ejemplo', 'patient', 'clinic-1');
   // add the remaining roles
-  await createUserIfMissing('specialist@local.test', 'specialist123', 'Especialista Ejemplo', 'specialist', 'clinic-1');
+  const specialist = await createUserIfMissing('specialist@local.test', 'specialist123', 'Especialista Ejemplo', 'specialist', 'clinic-1');
   await createUserIfMissing('leo.ibarralopez@gmail.com', 'admin123', 'Admin Ejemplo', 'admin', null);
+  await upsertProviderProfile(doctor.uid, 'doctor', {
+    professionalLicense: 'CMP 123456',
+    specialties: ['Medicina General'],
+    languages: ['Español'],
+    yearsExperience: 8,
+    bio: 'Médico general con enfoque en atención primaria, seguimiento de pacientes crónicos y prevención.',
+  });
+  await upsertProviderSchedule(doctor.uid, 'doctor', {
+    slotDurationMinutes: 30,
+  });
+  await upsertProviderProfile(specialist.uid, 'specialist', {
+    professionalLicense: 'RNE 987654',
+    specialties: ['Cardiología', 'Electrocardiografía'],
+    languages: ['Español', 'Inglés'],
+    yearsExperience: 12,
+    bio: 'Cardiólogo con experiencia en diagnóstico no invasivo y programas de rehabilitación cardiovascular.',
+  });
+  await upsertProviderSchedule(specialist.uid, 'specialist', {
+    slotDurationMinutes: 45,
+    weeklyAvailabilityOverrides: {
+      monday: [
+        { start: '10:00', end: '13:00' },
+        { start: '15:00', end: '19:00' },
+      ],
+      wednesday: [
+        { start: '10:00', end: '16:00' },
+      ],
+      friday: [
+        { start: '09:00', end: '12:00' },
+        { start: '14:00', end: '17:00' },
+      ],
+      saturday: [
+        { start: '09:00', end: '12:00' },
+      ],
+    },
+  });
   await ensureCheckoutDemo(doctor, patient);
+  await seedPatientEhrTimeline(patient, doctor);
   console.log('Seeding complete');
 }
 

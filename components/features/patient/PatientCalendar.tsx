@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchAppointmentsForToday } from '../../../api/appointments';
+import { fetchAppointmentsForPatient } from '../../../api/appointments';
+import { getPatientPortalOverview } from '../../../api/patientPortal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { type Appointment } from '../../../types';
 
@@ -35,7 +36,7 @@ const buildMonthMatrix = (year: number, month: number) => {
 const weekdayShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 const PatientCalendar: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [today] = useState(new Date());
@@ -43,22 +44,22 @@ const PatientCalendar: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setAppointments([]);
+      setLoading(false);
+      return;
+    }
+
     const load = async () => {
       setLoading(true);
       try {
-        const all = await fetchAppointmentsForToday();
-        // Filter appointments that belong to the logged user (best-effort): match by email or name
-        if (user) {
-          const filtered = all.filter(a => {
-            const patient = a.patient;
-            const matchesEmail = (patient.contactInfo?.email || '').toLowerCase() === (user.email || '').toLowerCase();
-            const matchesName = (`${patient.firstName} ${patient.lastName}`).toLowerCase().includes((user.name || '').toLowerCase());
-            return matchesEmail || matchesName;
-          });
-          setAppointments(filtered);
-        } else {
+        const portal = await getPatientPortalOverview();
+        if (!portal?.patient?.id) {
           setAppointments([]);
+          return;
         }
+        const patientAppointments = await fetchAppointmentsForPatient(portal.patient.id);
+        setAppointments(patientAppointments);
       } catch (err) {
         console.error('Failed fetching appointments for calendar', err);
         setAppointments([]);
@@ -67,7 +68,7 @@ const PatientCalendar: React.FC = () => {
       }
     };
     load();
-  }, [user]);
+  }, [isAuthenticated]);
 
   const year = displayMonth.getFullYear();
   const month = displayMonth.getMonth();

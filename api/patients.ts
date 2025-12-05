@@ -1,7 +1,7 @@
 import { type Patient, type QuickPatientInput } from '../types';
 import { callBackendFunction } from './functionsClient';
 
-const normalizePatient = (raw: any): Patient => ({
+export const normalizePatient = (raw: any): Patient => ({
     id: String(raw?.id || ''),
     firstName: String(raw?.firstName || ''),
     lastName: String(raw?.lastName || ''),

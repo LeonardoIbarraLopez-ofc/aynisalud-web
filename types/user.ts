@@ -8,4 +8,11 @@ export interface User {
   avatarUrl?: string;
   phone?: string;
   isActive: boolean;
+  professionalLicense?: string;
+  specialties?: string[];
+  languages?: string[];
+  yearsExperience?: number;
+  bio?: string;
+  patientProfileId?: string;
+  clinicId?: string;
 }

@@ -8,6 +8,7 @@ import AppLayout from '../layouts/AppLayout';
 import ConsultationPage from '../pages/ConsultationPage';
 import PatientAppointmentsPage from '../pages/PatientAppointmentsPage';
 const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'));
+const RequestAppointmentPage = React.lazy(() => import('../pages/RequestAppointmentPage'));
 const AdminUsersPage = React.lazy(() => import('../pages/AdminUsersPage'));
 
 const AdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,6 +45,14 @@ const AppRouter: React.FC = () => {
 
                     {/* Patient Portal Routes */}
                     <Route path="/mis-citas" element={<PatientAppointmentsPage />} />
+                    <Route
+                        path="/solicitar-cita"
+                        element={(
+                            <React.Suspense fallback={<div className="p-4">Cargando...</div>}>
+                                <RequestAppointmentPage />
+                            </React.Suspense>
+                        )}
+                    />
                     <Route path="/facturacion" element={<div className="p-4">Página de Facturación (en construcción)</div>} />
                     <Route path="/historial" element={<React.Suspense fallback={<div className="p-4">Cargando...</div>}><PatientMedicalHistoryPage /></React.Suspense>} />
 

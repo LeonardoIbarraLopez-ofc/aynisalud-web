@@ -283,22 +283,30 @@ exports.listAgendaAppointments = functions.https.onCall(listAgendaAppointmentsHa
 exports.listAgendaAppointmentsHttp = (0, httpHelpers_1.makeHttpHandler)(listAgendaAppointmentsHandler);
 const getAppointmentsForPatientHandler = async (data, context) => {
     const { token, uid } = await (0, utils_1.requireAuth)(context, data);
-    const patientId = data?.patientId;
-    if (!patientId) {
-        throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
-    }
     const role = token?.role;
+    let requestedPatientId = typeof data?.patientId === 'string' ? String(data.patientId).trim() : '';
     if (role === 'patient') {
-        const patientSnap = await utils_1.db.doc(`patients/${patientId}`).get();
-        if (!patientSnap.exists || patientSnap.data()?.authUid !== uid) {
+        const patientQuery = await utils_1.db.collection('patients').where('authUid', '==', uid).limit(1).get();
+        if (patientQuery.empty) {
+            throw new functions.https.HttpsError('failed-precondition', 'Debe completar su perfil de paciente antes de continuar.');
+        }
+        const ownPatientId = patientQuery.docs[0].id;
+        if (requestedPatientId && requestedPatientId !== ownPatientId) {
             throw new functions.https.HttpsError('permission-denied', 'No autorizado para ver estas citas.');
         }
+        requestedPatientId = ownPatientId;
     }
     else {
+        if (!requestedPatientId) {
+            throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
+        }
         ensureAgendaAccess(role);
     }
+    if (!requestedPatientId) {
+        throw new functions.https.HttpsError('invalid-argument', 'patientId requerido.');
+    }
     const ctxHydration = createHydrationContext();
-    const querySnap = await utils_1.db.collection('appointments').where('patientId', '==', patientId).get();
+    const querySnap = await utils_1.db.collection('appointments').where('patientId', '==', requestedPatientId).get();
     const appointments = [];
     for (const doc of querySnap.docs) {
         const appointment = await hydrateAppointment(doc, ctxHydration, true);
