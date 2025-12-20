@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveProviderScheduleHttp = exports.saveProviderSchedule = exports.getProviderScheduleHttp = exports.getProviderSchedule = exports.listPatientDoctorsHttp = exports.listPatientDoctors = exports.listPatientAppointmentTypesHttp = exports.listPatientAppointmentTypes = exports.requestAppointmentHttp = exports.requestAppointment = exports.getPatientAvailabilityHttp = exports.getPatientAvailability = exports.getPatientPortalOverviewHttp = exports.getPatientPortalOverview = exports.updateInvoiceHttp = exports.getInvoiceByIdHttp = exports.listPaidInvoicesForTodayHttp = exports.updateInvoice = exports.getInvoiceById = exports.listPaidInvoicesForToday = exports.listAppointmentTypesHttp = exports.listDoctorsHttp = exports.createQuickPatientHttp = exports.searchPatientsHttp = exports.updateAppointmentStatusHttp = exports.createAppointmentHttp = exports.getAppointmentByIdHttp = exports.getAppointmentsForPatientHttp = exports.listAgendaAppointmentsHttp = exports.listAppointmentTypes = exports.listDoctors = exports.createQuickPatient = exports.searchPatients = exports.updateAppointmentStatus = exports.createAppointment = exports.getAppointmentById = exports.getAppointmentsForPatient = exports.listAgendaAppointments = exports.verifyPasswordResetHttp = exports.requestPasswordResetHttp = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
-exports.addEhrEventHttp = exports.addEhrEvent = exports.getPatientEhrHttp = exports.getPatientEhr = void 0;
+exports.listPatientAppointmentTypesHttp = exports.listPatientAppointmentTypes = exports.requestAppointmentHttp = exports.requestAppointment = exports.getPatientAvailabilityHttp = exports.getPatientAvailability = exports.getPatientPortalOverviewHttp = exports.getPatientPortalOverview = exports.updateInvoiceHttp = exports.getInvoiceByIdHttp = exports.listPaidInvoicesForTodayHttp = exports.updateInvoice = exports.getInvoiceById = exports.listPaidInvoicesForToday = exports.listAppointmentTypesHttp = exports.listDoctorsHttp = exports.createQuickPatientHttp = exports.searchPatientsHttp = exports.updateAppointmentStatusHttp = exports.createAppointmentHttp = exports.getAppointmentByIdHttp = exports.getAppointmentsForPatientHttp = exports.listAgendaAppointmentsHttp = exports.listAppointmentTypes = exports.listDoctors = exports.createQuickPatient = exports.searchPatients = exports.updateAppointmentStatus = exports.createAppointment = exports.getAppointmentById = exports.getAppointmentsForPatient = exports.listAgendaAppointments = exports.verifyPasswordResetHttp = exports.requestPasswordResetHttp = exports.verifyAdmin2FAHttp = exports.requestAdmin2FAHttp = exports.verifyAdmin2FA = exports.requestAdmin2FA = exports.deleteUserAdminHttp = exports.deleteUserAdmin = exports.adminUpdateUserHttp = exports.adminUpdateUser = exports.listUsersHttp = exports.listUsers = exports.getMyProfileHttp = exports.getMyProfile = exports.setCustomClaims = exports.linkPatient = exports.updateProfile = exports.createUserAdmin = void 0;
+exports.getAppointmentAnalyticsHttp = exports.getAppointmentAnalytics = exports.addEhrEventHttp = exports.addEhrEvent = exports.getPatientEhrHttp = exports.getPatientEhr = exports.saveProviderScheduleHttp = exports.saveProviderSchedule = exports.getProviderScheduleHttp = exports.getProviderSchedule = exports.listPatientDoctorsHttp = exports.listPatientDoctors = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize the Admin SDK before loading modules that may call admin APIs
 // during top-level initialization. We use a runtime require for `users` so
@@ -52,6 +52,7 @@ const billing = require('./billing');
 const patientPortal = require('./patientPortal');
 const patientScheduling = require('./patientScheduling');
 const ehr = require('./ehr');
+const analytics = require('./analytics');
 // Re-export user callables from the main entry to ensure firebase-tools
 // discovers them when the codebase `main` points to this file.
 exports.createUserAdmin = users.createUserAdmin;
@@ -60,6 +61,12 @@ exports.linkPatient = users.linkPatient;
 exports.setCustomClaims = users.setCustomClaims;
 exports.getMyProfile = users.getMyProfile;
 exports.getMyProfileHttp = users.getMyProfileHttp;
+exports.listUsers = users.listUsers;
+exports.listUsersHttp = users.listUsersHttp;
+exports.adminUpdateUser = users.adminUpdateUser;
+exports.adminUpdateUserHttp = users.adminUpdateUserHttp;
+exports.deleteUserAdmin = users.deleteUserAdmin;
+exports.deleteUserAdminHttp = users.deleteUserAdminHttp;
 exports.requestAdmin2FA = admin2fa.requestAdmin2FA;
 exports.verifyAdmin2FA = admin2fa.verifyAdmin2FA;
 exports.requestAdmin2FAHttp = admin2fa.requestAdmin2FAHttp;
@@ -108,3 +115,5 @@ exports.getPatientEhr = ehr.getPatientEhr;
 exports.getPatientEhrHttp = ehr.getPatientEhrHttp;
 exports.addEhrEvent = ehr.addEhrEvent;
 exports.addEhrEventHttp = ehr.addEhrEventHttp;
+exports.getAppointmentAnalytics = analytics.getAppointmentAnalytics;
+exports.getAppointmentAnalyticsHttp = analytics.getAppointmentAnalyticsHttp;

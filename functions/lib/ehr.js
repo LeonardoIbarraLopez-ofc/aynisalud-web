@@ -132,6 +132,21 @@ function sanitizeLabOrders(values) {
     }))
         .filter(item => item.testName.length > 0);
 }
+function sanitizeLabResults(values) {
+    if (!Array.isArray(values))
+        return [];
+    return values
+        .map(item => ({
+        id: item?.id ? String(item.id) : undefined,
+        testName: String(item?.testName || ''),
+        resultValue: item?.resultValue ? String(item.resultValue) : undefined,
+        unit: item?.unit ? String(item.unit) : undefined,
+        referenceRange: item?.referenceRange ? String(item.referenceRange) : undefined,
+        interpretation: item?.interpretation ? String(item.interpretation) : undefined,
+        notes: item?.notes ? String(item.notes) : undefined,
+    }))
+        .filter(item => item.testName.length > 0);
+}
 function sanitizeVitals(values) {
     if (!Array.isArray(values))
         return [];
@@ -143,6 +158,19 @@ function sanitizeVitals(values) {
         unit: item?.unit ? String(item.unit) : undefined,
     }))
         .filter(item => item.name.length > 0 && item.value.length > 0);
+}
+function sanitizeDocuments(values) {
+    if (!Array.isArray(values))
+        return [];
+    return values
+        .map(item => ({
+        id: item?.id ? String(item.id) : undefined,
+        title: String(item?.title || ''),
+        url: item?.url ? String(item.url) : undefined,
+        description: item?.description ? String(item.description) : undefined,
+        type: item?.type ? String(item.type) : undefined,
+    }))
+        .filter(item => item.title.length > 0);
 }
 function sanitizeSoapNote(value) {
     if (!value || typeof value !== 'object')
@@ -171,6 +199,8 @@ function mapTimelineEvent(doc) {
         metadata.prescriptions = data.prescriptions;
     if (Array.isArray(data?.labOrders))
         metadata.labOrders = data.labOrders;
+    if (Array.isArray(data?.labResults))
+        metadata.labResults = data.labResults;
     if (Array.isArray(data?.vitals))
         metadata.vitals = data.vitals;
     if (Array.isArray(data?.attachments))
@@ -235,10 +265,25 @@ function buildSnapshot(patient, timeline) {
     }
     const latestLab = timeline.find(event => event.type === 'LabResult');
     if (latestLab) {
+        const labItems = latestLab.metadata?.labResults;
+        const labDetails = labItems && labItems.length > 0
+            ? labItems
+                .map(item => {
+                const pieces = [item.testName];
+                if (item.resultValue)
+                    pieces.push(item.resultValue);
+                if (item.unit)
+                    pieces.push(item.unit);
+                if (item.referenceRange)
+                    pieces.push(`Ref: ${item.referenceRange}`);
+                return pieces.join(' • ');
+            })
+                .join('\n')
+            : latestLab.summary;
         snapshot.push({
             type: 'note',
             title: latestLab.title,
-            details: latestLab.summary,
+            details: labDetails,
             date: latestLab.date,
             source: latestLab.actor,
             tags: latestLab.tags,
@@ -361,7 +406,9 @@ const addEhrEventHandler = async (data, context) => {
     const soapNote = sanitizeSoapNote(eventPayload.soapNote);
     const prescriptions = sanitizePrescriptions(eventPayload.prescriptions);
     const labOrders = sanitizeLabOrders(eventPayload.labOrders);
+    const labResults = sanitizeLabResults(eventPayload.labResults);
     const vitals = sanitizeVitals(eventPayload.vitals);
+    const documents = sanitizeDocuments(eventPayload.documents);
     const tags = sanitizeStringArray(eventPayload.tags);
     const eventDoc = {
         type: typeRaw || 'clinical_note',
@@ -375,8 +422,9 @@ const addEhrEventHandler = async (data, context) => {
         soapNote,
         prescriptions,
         labOrders,
+        labResults,
         vitals,
-        attachments: Array.isArray(eventPayload.attachments) ? eventPayload.attachments : undefined,
+        attachments: documents,
         actor: {
             uid: uid,
             name: actorData?.name || String(eventPayload.actorName || ''),
@@ -403,6 +451,9 @@ const addEhrEventHandler = async (data, context) => {
         title: eventDoc.title,
         summary: eventDoc.summary,
         tags,
+        prescriptionCount: eventDoc.prescriptions?.length || 0,
+        labOrderCount: eventDoc.labOrders?.length || 0,
+        labResultCount: eventDoc.labResults?.length || 0,
     });
     batch.set(searchableRef, searchableDoc);
     await batch.commit();

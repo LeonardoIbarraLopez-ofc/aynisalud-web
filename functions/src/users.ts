@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { requireAuth, db, auditLog } from './utils';
+import { makeHttpHandler } from './httpHelpers';
 
 // Small helper to safely stringify objects (avoid circulars) and truncate large output
 function safeStringify(obj: any, maxLen = 2000) {
@@ -20,6 +21,40 @@ function safeStringify(obj: any, maxLen = 2000) {
     return `<<safeStringify error: ${String(e)}>>`;
   }
 }
+
+  type UserRole = 'admin' | 'doctor' | 'specialist' | 'receptionist' | 'patient';
+
+  function buildSearchKeywords(values: Array<string | null | undefined>): string[] {
+    const tokens = new Set<string>();
+    values
+      .map(value => (value ?? '').toString().toLowerCase().trim())
+      .filter(value => value.length > 0)
+      .forEach(value => {
+        tokens.add(value);
+        value.split(/\s+/).forEach(part => {
+          if (part.length > 0) tokens.add(part);
+        });
+      });
+    return Array.from(tokens).slice(0, 40);
+  }
+
+  function normalizeBoolean(value: any, fallback: boolean): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const lc = value.toLowerCase();
+      if (['true', '1', 'yes'].includes(lc)) return true;
+      if (['false', '0', 'no'].includes(lc)) return false;
+    }
+    return fallback;
+  }
+
+  function coerceRole(value: any, current: UserRole): UserRole {
+    const allowed: UserRole[] = ['admin', 'doctor', 'receptionist', 'specialist', 'patient'];
+    if (typeof value === 'string' && allowed.includes(value as UserRole)) {
+      return value as UserRole;
+    }
+    return current;
+  }
 
 // Create user (admin only). Creates Firebase Auth user and users/{uid} document.
 export const createUserAdmin = functions.https.onCall(async (data: any, context: any) => {
@@ -113,6 +148,7 @@ export const createUserAdmin = functions.https.onCall(async (data: any, context:
     isActive: true,
     avatarUrl,
     clinicId,
+    searchKeywords: buildSearchKeywords([name, email, userRecord.uid]),
     // Use serverTimestamp if available, otherwise fallback to current Date for emulator/runtime
     createdAt: (admin.firestore && (admin.firestore as any).FieldValue && (admin.firestore as any).FieldValue.serverTimestamp)
       ? (admin.firestore as any).FieldValue.serverTimestamp()
@@ -153,10 +189,19 @@ export const updateProfile = functions.https.onCall(async (data: any, context: a
   // Prevent role changes from non-admin
   if (fields.role && caller.token.role !== 'admin') delete fields.role;
 
-  fields.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  const updates: Record<string, any> = { ...fields };
+  updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
-  await db.doc(`users/${targetUid}`).set(fields, { merge: true });
-  await auditLog(caller.uid as string, 'update_user', 'users', targetUid, { fields });
+  if (fields.name || fields.email) {
+    const currentSnap = await db.doc(`users/${targetUid}`).get();
+    const currentData = currentSnap.exists ? currentSnap.data() : {};
+    const nextName = typeof fields.name === 'string' ? fields.name : (currentData?.name || '');
+    const nextEmail = typeof fields.email === 'string' ? fields.email : (currentData?.email || '');
+    updates.searchKeywords = buildSearchKeywords([nextName, nextEmail, targetUid]);
+  }
+
+  await db.doc(`users/${targetUid}`).set(updates, { merge: true });
+  await auditLog(caller.uid as string, 'update_user', 'users', targetUid, { fields: updates });
   return { success: true };
 });
 
@@ -204,6 +249,224 @@ export const setCustomClaims = functions.https.onCall(async (data: any, context:
   await auditLog(caller.uid as string, 'set_custom_claims', 'users', uid, { claims });
   return { success: true };
 });
+
+const listUsersHandler = async (data: any, context: any) => {
+  const caller = await requireAuth(context, data);
+  if (!caller.token || caller.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admin');
+  }
+
+  const rawSearch = typeof data?.search === 'string' ? data.search.trim().toLowerCase() : '';
+  const rawRole = typeof data?.role === 'string' ? data.role.trim().toLowerCase() : '';
+  const limitRaw = Number(data?.limit);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 200;
+
+  const allowedRoles: UserRole[] = ['admin', 'doctor', 'receptionist', 'specialist', 'patient'];
+  const roleFilter = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
+
+  let query: admin.firestore.Query<admin.firestore.DocumentData> = db.collection('users');
+  if (roleFilter) {
+    query = query.where('role', '==', roleFilter);
+  }
+
+  const snapshot = await query.limit(limit).get();
+  let users: Array<Record<string, any>> = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...(doc.data() as Record<string, any>),
+  }));
+
+  if (rawSearch) {
+    users = users.filter(user => {
+      const name = (user.name || '').toString().toLowerCase();
+      const email = (user.email || '').toString().toLowerCase();
+      const clinicId = (user.clinicId || '').toString().toLowerCase();
+      const tokens: string[] = Array.isArray(user.searchKeywords)
+        ? user.searchKeywords.map((token: any) => (token || '').toString().toLowerCase())
+        : [];
+      return (
+        name.includes(rawSearch) ||
+        email.includes(rawSearch) ||
+        clinicId.includes(rawSearch) ||
+        tokens.includes(rawSearch)
+      );
+    });
+  }
+
+  users.sort((a, b) => {
+    const nameA = (a.name || '').toString().toLowerCase();
+    const nameB = (b.name || '').toString().toLowerCase();
+    if (nameA === nameB) {
+      return (a.email || '').toString().localeCompare((b.email || '').toString(), 'es', { sensitivity: 'base' });
+    }
+    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+  });
+
+  return { users };
+};
+
+export const listUsers = functions.https.onCall(listUsersHandler);
+export const listUsersHttp = makeHttpHandler(listUsersHandler);
+
+const adminUpdateUserHandler = async (data: any, context: any) => {
+  const caller = await requireAuth(context, data);
+  if (!caller.token || caller.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admin');
+  }
+
+  const uid = typeof data?.uid === 'string' ? data.uid.trim() : '';
+  const updates = data?.updates && typeof data.updates === 'object' ? data.updates : {};
+
+  if (!uid) throw new functions.https.HttpsError('invalid-argument', 'uid required');
+  if (Object.keys(updates).length === 0) throw new functions.https.HttpsError('invalid-argument', 'updates required');
+
+  const userRef = db.doc(`users/${uid}`);
+  const userSnap = await userRef.get();
+  const currentData = userSnap.exists ? (userSnap.data() as Record<string, any>) : {};
+
+  const authUpdates: admin.auth.UpdateRequest = {};
+  if (typeof updates.email === 'string') {
+    const nextEmail = updates.email.trim();
+    if (!nextEmail) throw new functions.https.HttpsError('invalid-argument', 'email cannot be empty');
+    authUpdates.email = nextEmail;
+  }
+  if (typeof updates.password === 'string' && updates.password.trim().length > 0) {
+    authUpdates.password = updates.password;
+  }
+
+  const firestoreUpdates: Record<string, any> = {};
+  const allowedFirestoreFields = [
+    'name',
+    'email',
+    'role',
+    'phone',
+    'clinicId',
+    'avatarUrl',
+    'isActive',
+    'specialties',
+    'languages',
+    'yearsExperience',
+    'bio',
+    'patientProfileId',
+  ];
+
+  for (const field of allowedFirestoreFields) {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      firestoreUpdates[field] = updates[field];
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(firestoreUpdates, 'isActive')) {
+    firestoreUpdates.isActive = normalizeBoolean(firestoreUpdates.isActive, currentData?.isActive !== false);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(firestoreUpdates, 'role')) {
+    firestoreUpdates.role = coerceRole(firestoreUpdates.role, currentData?.role || 'patient');
+  }
+
+  if (typeof firestoreUpdates.clinicId === 'string') {
+    firestoreUpdates.clinicId = firestoreUpdates.clinicId.trim() || null;
+  }
+
+  if (typeof firestoreUpdates.phone === 'string') {
+    firestoreUpdates.phone = firestoreUpdates.phone.trim();
+  }
+
+  if (firestoreUpdates.specialties) {
+    firestoreUpdates.specialties = Array.isArray(firestoreUpdates.specialties)
+      ? firestoreUpdates.specialties.filter(Boolean)
+      : [firestoreUpdates.specialties].filter(Boolean);
+  }
+
+  if (firestoreUpdates.languages) {
+    firestoreUpdates.languages = Array.isArray(firestoreUpdates.languages)
+      ? firestoreUpdates.languages.filter(Boolean)
+      : [firestoreUpdates.languages].filter(Boolean);
+  }
+
+  if (Object.keys(authUpdates).length > 0) {
+    await admin.auth().updateUser(uid, authUpdates);
+  }
+
+  if (firestoreUpdates.email === undefined && authUpdates.email) {
+    firestoreUpdates.email = authUpdates.email;
+  }
+
+  const nextName = firestoreUpdates.name !== undefined ? firestoreUpdates.name : currentData?.name || '';
+  const nextEmail = firestoreUpdates.email !== undefined ? firestoreUpdates.email : currentData?.email || '';
+  if (firestoreUpdates.name !== undefined || firestoreUpdates.email !== undefined) {
+    firestoreUpdates.searchKeywords = buildSearchKeywords([nextName, nextEmail, uid]);
+  }
+
+  firestoreUpdates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+  if (Object.keys(firestoreUpdates).length > 0) {
+    await userRef.set(firestoreUpdates, { merge: true });
+  }
+
+  if (firestoreUpdates.role !== undefined || firestoreUpdates.clinicId !== undefined) {
+    const userRecord = await admin.auth().getUser(uid);
+    const currentClaims = userRecord.customClaims || {};
+    const newClaims = { ...currentClaims } as Record<string, any>;
+    if (firestoreUpdates.role !== undefined) {
+      newClaims.role = firestoreUpdates.role;
+    }
+    if (firestoreUpdates.clinicId !== undefined) {
+      newClaims.clinicId = firestoreUpdates.clinicId || null;
+    }
+    await admin.auth().setCustomUserClaims(uid, newClaims);
+  }
+
+  await auditLog(caller.uid as string, 'admin_update_user', 'users', uid, {
+    updates: firestoreUpdates,
+    authUpdates: Object.keys(authUpdates).length > 0,
+  });
+
+  return { success: true };
+};
+
+export const adminUpdateUser = functions.https.onCall(adminUpdateUserHandler);
+export const adminUpdateUserHttp = makeHttpHandler(adminUpdateUserHandler);
+
+const deleteUserAdminHandler = async (data: any, context: any) => {
+  const caller = await requireAuth(context, data);
+  if (!caller.token || caller.token.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admin');
+  }
+
+  const uid = typeof data?.uid === 'string' ? data.uid.trim() : '';
+  if (!uid) throw new functions.https.HttpsError('invalid-argument', 'uid required');
+
+  const userRef = db.doc(`users/${uid}`);
+  const userSnap = await userRef.get();
+  const payload = userSnap.exists ? (userSnap.data() as Record<string, any>) : null;
+
+  if (userSnap.exists) {
+    await userRef.delete();
+  }
+
+  const patientProfileId = payload?.patientProfileId;
+  if (patientProfileId) {
+    const patientRef = db.doc(`patients/${patientProfileId}`);
+    await patientRef.set({ authUid: admin.firestore.FieldValue.delete() }, { merge: true }).catch(() => undefined);
+  }
+
+  try {
+    await admin.auth().deleteUser(uid);
+  } catch (err: any) {
+    if (!err || err.code !== 'auth/user-not-found') {
+      throw err;
+    }
+  }
+
+  await auditLog(caller.uid as string, 'delete_user', 'users', uid, {
+    hadProfile: !!patientProfileId,
+  });
+
+  return { success: true };
+};
+
+export const deleteUserAdmin = functions.https.onCall(deleteUserAdminHandler);
+export const deleteUserAdminHttp = makeHttpHandler(deleteUserAdminHandler);
 
 // Callable to fetch the current authenticated user's profile document
 export const getMyProfile = functions.https.onCall(async (data: any, context: any) => {
